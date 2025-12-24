@@ -67,7 +67,7 @@ const SignUpScreen = ({ navigation }: any) => {
       return
     }
 
-    // ✅ Signup success
+   
     alert(
       'Account created successfully. Please check your email to verify your account.'
     )
