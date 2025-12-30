@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase'
 
 const SignUpScreen = ({ navigation }: any) => {
@@ -26,56 +26,56 @@ const SignUpScreen = ({ navigation }: any) => {
 
 
   const handleSignUp = async () => {
-  setErrorMessage('')
+    setErrorMessage('')
 
-  if (!name || !email || !password || !confirmPassword) {
-    setErrorMessage('Please fill all fields')
-    return
-  }
-
-  if (password !== confirmPassword) {
-    setErrorMessage('Passwords do not match')
-    return
-  }
-
-  try {
-    setLoading(true)
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name },
-      },
-    })
-
-    if (error) {
-      const msg = error.message.toLowerCase()
-
-     
-      if (
-        msg.includes('already') ||
-        msg.includes('registered') ||
-        msg.includes('exists')
-      ) {
-        setErrorMessage(
-          'This email is already registered. Please log in instead.'
-        )
-      } else {
-        setErrorMessage(error.message)
-      }
+    if (!name || !email || !password || !confirmPassword) {
+      setErrorMessage('Please fill all fields')
       return
     }
 
-   
-    alert(
-      'Account created successfully. Please check your email to verify your account.'
-    )
-    navigation.navigate('Login')
-  } finally {
-    setLoading(false)
+    if (password !== confirmPassword) {
+      setErrorMessage('Passwords do not match')
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { name },
+        },
+      })
+
+      if (error) {
+        const msg = error.message.toLowerCase()
+
+
+        if (
+          msg.includes('already') ||
+          msg.includes('registered') ||
+          msg.includes('exists')
+        ) {
+          setErrorMessage(
+            'This email is already registered. Please log in instead.'
+          )
+        } else {
+          setErrorMessage(error.message)
+        }
+        return
+      }
+
+
+      alert(
+        'Account created successfully. Please check your email to verify your account.'
+      )
+      navigation.navigate('Login')
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
 
 
@@ -170,14 +170,14 @@ const SignUpScreen = ({ navigation }: any) => {
           onPress={handleSignUp}
           disabled={loading}
         >
-        <Text style={styles.primaryButtonText}>
-          {loading ? 'Creating...' : 'Create Account'}
-        </Text>
+          <Text style={styles.primaryButtonText}>
+            {loading ? 'Creating...' : 'Create Account'}
+          </Text>
         </TouchableOpacity>
         {errorMessage ? (
-        <Text style={{ color: '#EF4444', marginBottom: 12 }}>
-        {errorMessage}
-        </Text>
+          <Text style={{ color: '#EF4444', marginBottom: 12 }}>
+            {errorMessage}
+          </Text>
         ) : null}
 
 

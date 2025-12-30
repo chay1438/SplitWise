@@ -4,6 +4,7 @@
     "slug": "splitwise-app",
     "version": "1.0.0",
     "orientation": "portrait",
+    "plugins": [],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
