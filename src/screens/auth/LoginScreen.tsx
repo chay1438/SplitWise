@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native'
-import { Ionicons as Icon } from '@expo/vector-icons'
+import Icon from 'react-native-vector-icons/Ionicons';
 import { supabase } from '../../lib/supabase'
 
 export default function LoginScreen({ navigation }: any) {
@@ -25,19 +25,19 @@ export default function LoginScreen({ navigation }: any) {
     try {
       setLoading(true)
 
-      const { data,error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
-      console.log('login response:',data)
-      console.log('login error:',error)
+      console.log('login response:', data)
+      console.log('login error:', error)
 
       if (error) {
         alert(error.message)
         return
       }
 
-    
+
     } finally {
       setLoading(false)
     }
