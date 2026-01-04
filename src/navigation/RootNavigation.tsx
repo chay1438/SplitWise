@@ -1,3 +1,4 @@
+import React from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import AuthStack from './AuthStack'
 import AppStack from './AppStack'
@@ -9,8 +10,8 @@ export default function RootNavigation() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0B0B0B' }}>
+        <ActivityIndicator size="large" color="#FF8C32" />
       </View>
     )
   }

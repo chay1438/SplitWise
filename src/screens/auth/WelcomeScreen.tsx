@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, AntDesign } from '@expo/vector-icons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import AntDesign from 'react-native-vector-icons/AntDesign';
 
 export default function WelcomeScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       <View style={styles.contentContainer}>
         {/* Logo Section */}
         <View style={styles.logoContainer}>
@@ -34,7 +35,7 @@ export default function WelcomeScreen({ navigation }: any) {
             <Text style={styles.googleButtonText}>Continue with Google</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.emailButton}
             onPress={() => navigation.navigate('Signup')}
           >
