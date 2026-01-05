@@ -1,9 +1,24 @@
 export type AppStackParamList = {
     MainTabs: undefined;
     MakeGroup: undefined;
+    EditGroup: { groupId: string };
     GroupDetails: { groupId: string; groupName: string };
-    AddExpense: undefined;
-    SettleUp: undefined;
+    AddExpense: { groupId: string; groupName: string };
+    EditExpense: { expenseId: string; groupId: string };
+    SettleUp: { userId?: string; groupId?: string } | undefined;
+    ExpenseDetail: { expense: any };
+    FriendDetail: { friendId: string };
+    Notifications: undefined;
+    Search: undefined;
+    ReceiptViewer: {
+        imageUrl: string;
+        expenseId: string;
+        description: string;
+        date: string;
+        amount: number;
+    };
+    Filter: { currentFilters?: any };
+    CategorySelector: { onSelect: (category: string) => void };
 };
 
 export type BottomTabParamList = {

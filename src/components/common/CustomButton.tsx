@@ -7,7 +7,7 @@ import {
     ViewStyle,
     TextStyle,
 } from 'react-native';
-import { Colors, Spacing } from '../../theme';
+import { Colors, Spacing } from '../../constants';
 
 interface CustomButtonProps {
     onPress: () => void;

@@ -1,50 +1,71 @@
 import { apiSlice } from './apiSlice';
-import { expenseService } from '../../services/expenseService';
-import { Expense } from '../../lib/types';
+import { supabase } from '../../lib/supabase';
+import { Expense, ExpenseWithDetails } from '../../types';
 
-export const expensesApi = apiSlice.injectEndpoints({
+import { expenseService } from '../../services/expenseService';
+
+export const expensesApiSlice = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
-        fetchGroupExpenses: builder.query<Expense[], string>({
-            queryFn: async (groupId) => {
+
+        getExpenses: builder.query<ExpenseWithDetails[], { groupId?: string; userId?: string }>({
+            queryFn: async (filters) => {
                 try {
-                    const data = await expenseService.fetchGroupExpenses(groupId);
-                    return { data: data as Expense[] };
+                    const data = await expenseService.getExpenses(filters);
+                    return { data };
                 } catch (error: any) {
                     return { error: error.message };
                 }
             },
-            providesTags: (result, error, groupId) =>
-                result
-                    ? [
-                        ...result.map(({ id }) => ({ type: 'Expenses' as const, id })),
-                        { type: 'Expenses', id: `LIST_${groupId}` },
-                    ]
-                    : [{ type: 'Expenses', id: `LIST_${groupId}` }],
+            providesTags: ['Expenses']
         }),
-        createExpense: builder.mutation<
-            Expense,
-            {
-                groupId: string;
-                amount: number;
-                description: string;
-                splitType: 'EQUAL' | 'SELECTIVE' | 'INDIVIDUAL';
-                splits: { user_id: string; share_amount: number }[];
-            }
-        >({
-            queryFn: async ({ groupId, amount, description, splitType, splits }) => {
+
+        createExpense: builder.mutation<Expense, {
+            groupId?: string;
+            description: string;
+            amount: number;
+            date: string;
+            paidBy: string;
+            splits: { userId: string; amount: number }[];
+            userId: string;
+            receiptUrl?: string;
+            friendId?: string;
+        }>({
+            queryFn: async (input) => {
                 try {
-                    const data = await expenseService.createExpense(groupId, amount, description, splitType, splits);
-                    return { data: data as Expense };
+                    const data = await expenseService.createExpense(input);
+                    return { data };
                 } catch (error: any) {
                     return { error: error.message };
                 }
             },
-            invalidatesTags: (result, error, { groupId }) => [
-                { type: 'Expenses', id: `LIST_${groupId}` },
-                // Also invalidate balances if we had a balance API
-            ],
+            invalidatesTags: ['Expenses', 'Balances', 'Groups']
         }),
+
+        deleteExpense: builder.mutation<void, string>({
+            queryFn: async (expenseId) => {
+                try {
+                    await expenseService.deleteExpense(expenseId);
+                    return { data: undefined };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            },
+            invalidatesTags: ['Expenses', 'Balances']
+        }),
+
+        updateExpense: builder.mutation<any, { id: string; updates: any }>({
+            queryFn: async ({ id, updates }) => {
+                try {
+                    const data = await expenseService.updateExpense(id, updates);
+                    return { data };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            },
+            invalidatesTags: ['Expenses', 'Balances', 'Groups']
+        }),
+
     }),
 });
 
-export const { useFetchGroupExpensesQuery, useCreateExpenseMutation } = expensesApi;
+export const { useGetExpensesQuery, useCreateExpenseMutation, useDeleteExpenseMutation, useUpdateExpenseMutation } = expensesApiSlice;

@@ -5,8 +5,22 @@ import AppStack from './AppStack'
 import { useAuth } from '../hooks/useAuth'
 import { ActivityIndicator, View } from 'react-native'
 
+import * as Linking from 'expo-linking';
+
+const linking = {
+  prefixes: [Linking.createURL('/'), 'splitwise://'],
+  config: {
+    screens: {
+      Login: 'login',
+      UpdatePassword: 'reset-password',
+    },
+  },
+};
+
 export default function RootNavigation() {
-  const { user, loading } = useAuth()
+  const { session, loading } = useAuth()
+  console.log('ROOT NAV SESSION:', !!session);
+  console.log('ROOT NAV LOADING:', loading);
 
   if (loading) {
     return (
@@ -17,8 +31,8 @@ export default function RootNavigation() {
   }
 
   return (
-    <NavigationContainer>
-      {user ? <AppStack /> : <AuthStack />}
+    <NavigationContainer linking={linking}>
+      {session ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
   )
 }

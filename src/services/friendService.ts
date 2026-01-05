@@ -1,62 +1,105 @@
 import { supabase } from '../lib/supabase';
-import { Profile } from '../lib/types';
+import { Profile } from '../types';
 
 export const friendService = {
-  /**
-   * Search for users by email or name.
-   */
-  async searchUsers(query: string) {
-    if (!query) return [];
+    async getFriends(userId: string): Promise<Profile[]> {
+        const { data, error } = await supabase
+            .from('friendships')
+            .select(`
+                user_id1,
+                user_id2,
+                status
+            `)
+            .or(`user_id1.eq.${userId},user_id2.eq.${userId}`)
+            .eq('status', 'accepted');
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .or(`email.ilike.%${query}%,name.ilike.%${query}%`)
-      .limit(10);
+        if (error) throw error;
 
-    if (error) throw error;
-    return data as Profile[];
-  },
+        const friendIds = data.map(f => f.user_id1 === userId ? f.user_id2 : f.user_id1);
 
-  /**
-   * Get a list of "friends". 
-   * For now, this might just be users you have a balance with or valid group members.
-   * But usually this involves a friends table. I'll return a mock empty or all profiles for now if no specific logic exists.
-   * Actually, let's just return profiles in your groups.
-   */
-  async getFriends() {
-    // Determine friends as people you are in groups with.
-    // 1. Get my groups
-    const { data: authData } = await supabase.auth.getUser();
-    if (!authData.user) throw new Error('Not authenticated');
+        if (friendIds.length === 0) return [];
 
-    const { data: myGroups } = await supabase
-        .from('group_members')
-        .select('group_id')
-        .eq('user_id', authData.user.id);
-    
-    if (!myGroups || myGroups.length === 0) return [];
+        const { data: profiles, error: pError } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', friendIds);
 
-    const groupIds = myGroups.map(g => g.group_id);
+        if (pError) throw pError;
+        return profiles as Profile[];
+    },
 
-    // 2. Get user IDs in these groups
-    const { data: memberData } = await supabase
-        .from('group_members')
-        .select('user_id')
-        .in('group_id', groupIds)
-        .neq('user_id', authData.user.id); // Exclude self
+    async sendFriendRequest(fromUserId: string, toUserId: string) {
+        // Send a friend request (status: pending)
+        const { error } = await supabase
+            .from('friendships')
+            .insert({
+                user_id1: fromUserId,  // Sender
+                user_id2: toUserId,    // Recipient
+                status: 'pending'      // ✅ Pending, not accepted!
+            });
+        if (error) throw error;
+    },
 
-    if (!memberData || memberData.length === 0) return [];
+    async acceptFriendRequest(requestId: string, userId: string) {
+        // Accept a friend request (only recipient can accept)
+        const { error } = await supabase
+            .from('friendships')
+            .update({ status: 'accepted' })
+            .eq('id', requestId)
+            .eq('user_id2', userId);  // Must be the recipient
+        if (error) throw error;
+    },
 
-    const friendIds = [...new Set(memberData.map(m => m.user_id))];
+    async rejectFriendRequest(requestId: string, userId: string) {
+        // Reject/remove a friend request
+        const { error } = await supabase
+            .from('friendships')
+            .delete()
+            .eq('id', requestId)
+            .eq('user_id2', userId);  // Must be the recipient
+        if (error) throw error;
+    },
 
-    // 3. Get profiles
-    const { data: friends, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', friendIds);
+    async getPendingRequests(userId: string): Promise<any[]> {
+        // Get friend requests sent TO you (that you need to accept/reject)
+        const { data, error } = await supabase
+            .from('friendships')
+            .select(`
+                id,
+                user_id1,
+                created_at,
+                sender:profiles!user_id1(*)
+            `)
+            .eq('user_id2', userId)
+            .eq('status', 'pending');
 
-    if (error) throw error;
-    return friends as Profile[];
-  }
+        if (error) throw error;
+        return data || [];
+    },
+
+    async searchUsers(query: string): Promise<Profile[]> {
+        if (query.length < 3) return [];
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)  // Search by name OR email
+            .limit(10);
+        if (error) throw error;
+        return data || [];
+    },
+
+    async searchUserByEmail(email: string): Promise<Profile | null> {
+        // Search for a specific user by exact email
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', email)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') return null; // Not found
+            throw error;
+        }
+        return data as Profile;
+    }
 };

@@ -1,56 +1,54 @@
-import { useEffect, useState } from 'react'
-import { Session, User } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import { useEffect } from 'react';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { selectUser, selectSession, selectIsLoading, setSession, setUser } from '../store/slices/authSlice';
+import { useInitializeAuthQuery } from '../store/api/authApi';
+import { supabase } from '../lib/supabase';
+import { Profile } from '../types';
 
-export const useAuth = () => {
-  const [session, setSession] = useState<Session | null>(null)
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+export function useAuth() {
+  const dispatch = useAppDispatch();
+  const user = useAppSelector(selectUser);
+  const session = useAppSelector(selectSession);
+  const isLoadingStore = useAppSelector(selectIsLoading);
 
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-
-    if (!error) setProfile(data)
-  }
+  // Initial auth check
+  const {
+    data: initData,
+    isLoading: isInitLoading,
+    refetch
+  } = useInitializeAuthQuery();
 
   useEffect(() => {
-    // Initial session
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setUser(data.session?.user ?? null)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
 
-      if (data.session?.user) {
-        fetchProfile(data.session.user.id)
-      }
+      if (event === 'SIGNED_OUT' || session === null) {
+        // Clear all auth state on sign out
+        dispatch(setSession(null));
+        dispatch(setUser(null));
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        dispatch(setSession(session));
 
-      setLoading(false)
-    })
-
-    // Auth listener
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-
+        // Fetch user profile
         if (session?.user) {
-          fetchProfile(session.user.id)
-        } else {
-          setProfile(null)
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          if (data) dispatch(setUser(data));
         }
-
-        setLoading(false)
       }
-    )
+    });
 
-    return () => {
-      listener.subscription.unsubscribe()
-    }
-  }, [])
+    return () => subscription.unsubscribe();
+  }, [dispatch]); // Only depend on dispatch, not user
 
-  return { user, session, profile, loading }
+  return {
+    session,
+    user,
+    profile: user, // Alias user as profile for compatibility
+    loading: isLoadingStore || isInitLoading,
+    isAuthenticated: !!session,
+    refreshSession: refetch
+  };
 }

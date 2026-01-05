@@ -1,55 +1,32 @@
-import { supabase } from '../lib/supabase'
-import { Balance } from '../lib/types'
+import { supabase } from '../lib/supabase';
+import { BalanceSummary } from '../types';
 
 export const balanceService = {
-  /**
-   * Fetch all balances involving the logged-in user.
-   * Used for Home screen: "You owe" & "Owes you"
-   */
-  async fetchMyBalances() {
-    const { data, error } = await supabase
-      .from('balances')
-      .select('*')
+    async getUserBalanceSummary(userId: string): Promise<BalanceSummary> {
+        const { data, error } = await supabase
+            .from('group_balances_view')
+            .select('*')
+            .eq('user_id', userId);
 
-    if (error) throw error
+        if (error) throw error;
 
-    return data as Balance[]
-  },
+        let totalOwed = 0;
+        let totalOwing = 0;
+        data.forEach((r: any) => {
+            const val = parseFloat(r.net_balance);
+            if (val > 0) totalOwed += val;
+            else totalOwing += Math.abs(val);
+        });
 
-  /**
-   * Fetch balances for a specific group.
-   * Used in Group summary screen.
-   */
-  async fetchGroupBalances(groupId: string) {
-    const { data, error } = await supabase
-      .from('balances')
-      .select('*')
-      .eq('group_id', groupId)
+        return { totalOwed, totalOwing, netBalance: totalOwed - totalOwing };
+    },
 
-    if (error) throw error
-
-    return data as Balance[]
-  },
-
-  /**
-   * Calculate net balance for Home screen.
-   * Positive = others owe you
-   * Negative = you owe others
-   */
-  async fetchMyNetBalance() {
-    const balances = await this.fetchMyBalances()
-
-    let net = 0
-
-    for (const b of balances) {
-      if (b.to_user_id === b.id) {
-        net += b.amount
-      }
-      if (b.from_user_id === b.id) {
-        net -= b.amount
-      }
+    async getBalances(userId: string) {
+        const { data, error } = await supabase
+            .from('group_balances_view')
+            .select('*')
+            .eq('user_id', userId);
+        if (error) throw error;
+        return data || [];
     }
-
-    return net
-  },
-}
+};

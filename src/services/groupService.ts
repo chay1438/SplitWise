@@ -1,74 +1,76 @@
 import { supabase } from '../lib/supabase';
-import { Group, GroupMember } from '../lib/types';
+import { Group, GroupWithMembers } from '../types';
 
 export const groupService = {
-    /**
-     * Fetch groups that the current user belongs to.
-     */
-    async fetchMyGroups() {
-        // 1. Get group_ids from group_members
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError || !authData.user) throw new Error('User not authenticated');
-
-        const { data: memberData, error: memberError } = await supabase
+    async getGroups(userId: string): Promise<GroupWithMembers[]> {
+        const { data: memberships, error: memberError } = await supabase
             .from('group_members')
             .select('group_id')
-            .eq('user_id', authData.user.id);
+            .eq('user_id', userId);
 
         if (memberError) throw memberError;
+        if (!memberships?.length) return [];
 
-        if (!memberData || memberData.length === 0) return [];
+        const groupIds = memberships.map(m => m.group_id);
 
-        const groupIds = memberData.map((m: any) => m.group_id);
-
-        // 2. Fetch groups
-        const { data: groups, error: groupsError } = await supabase
+        const { data, error } = await supabase
             .from('groups')
-            .select('*')
+            .select(`
+                *,
+                members:group_members(
+                    role,
+                    profile:profiles!user_id(*)
+                )
+            `)
             .in('id', groupIds)
             .order('created_at', { ascending: false });
 
-        if (groupsError) throw groupsError;
+        if (error) throw error;
 
-        return groups as Group[];
+        return data.map((g: any) => ({
+            ...g,
+            members: g.members.map((m: any) => m.profile).filter(Boolean)
+        })) as GroupWithMembers[];
     },
 
-    /**
-     * Create a new group and add the creator as a member.
-     */
-    async createGroup(name: string) {
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError || !authData.user) throw new Error('User not authenticated');
-
-        const userId = authData.user.id;
-
-        // 1. Create group
-        const { data: groupData, error: groupError } = await supabase
+    async createGroup(data: { name: string; type: string; createdBy: string; memberIds?: string[] }): Promise<Group> {
+        const { data: group, error } = await supabase
             .from('groups')
             .insert({
-                name,
-                created_by: userId,
+                name: data.name,
+                type: data.type,
+                created_by: data.createdBy
             })
             .select()
             .single();
 
-        if (groupError) throw groupError;
+        if (error) throw error;
 
-        // 2. Add creator as member (admin)
-        const { error: memberError } = await supabase
+        const allMembers = new Set([...(data.memberIds || []), data.createdBy]);
+        const memberInserts = Array.from(allMembers).map(userId => ({
+            group_id: group.id,
+            user_id: userId,
+            role: userId === data.createdBy ? 'admin' : 'member'
+        }));
+
+        const { error: memberError } = await supabase.from('group_members').insert(memberInserts);
+        if (memberError) throw memberError;
+
+        return group;
+    },
+
+    async addMember(groupId: string, userId: string) {
+        const { error } = await supabase
             .from('group_members')
-            .insert({
-                group_id: groupData.id,
-                user_id: userId,
-                role: 'admin',
-            });
+            .insert({ group_id: groupId, user_id: userId, role: 'member' });
+        if (error) throw error;
+    },
 
-        if (memberError) {
-            // Cleanup if member creation fails? For now just throw.
-            console.error('Failed to add creator as member:', memberError);
-            throw memberError;
-        }
-
-        return groupData as Group;
+    async updateGroup(groupId: string, data: { name?: string; type?: string }): Promise<void> {
+        const { error } = await supabase
+            .from('groups')
+            .update(data)
+            .eq('id', groupId);
+        if (error) throw error;
     }
 };

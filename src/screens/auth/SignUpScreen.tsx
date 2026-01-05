@@ -8,7 +8,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { supabase } from '../../lib/supabase'
+import { useSignUpMutation } from '../../store/api/authApi';
 
 const SignUpScreen = ({ navigation }: any) => {
   const [name, setName] = useState('')
@@ -17,13 +17,9 @@ const SignUpScreen = ({ navigation }: any) => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
-
-
-
-
+  const [signUp, { isLoading: loading }] = useSignUpMutation();
 
   const handleSignUp = async () => {
     setErrorMessage('')
@@ -33,47 +29,55 @@ const SignUpScreen = ({ navigation }: any) => {
       return
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setErrorMessage('Please enter a valid email address');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match')
       return
     }
 
     try {
-      setLoading(true)
+      await signUp({ email, password, name }).unwrap();
 
-      const { error } = await supabase.auth.signUp({
+      // Success! Navigate to Login with success message
+      setErrorMessage('') // clear any error
+      navigation.navigate('Login', {
         email,
-        password,
-        options: {
-          data: { name },
-        },
+        successMessage: 'Account created successfully! Please log in to continue.'
       })
+    } catch (err: any) {
+      console.log('Signup error:', err);
+      let msg = 'An unexpected error occurred';
 
-      if (error) {
-        const msg = error.message.toLowerCase()
-
-
-        if (
-          msg.includes('already') ||
-          msg.includes('registered') ||
-          msg.includes('exists')
-        ) {
-          setErrorMessage(
-            'This email is already registered. Please log in instead.'
-          )
-        } else {
-          setErrorMessage(error.message)
-        }
-        return
+      if (typeof err === 'string') {
+        msg = err;
+      } else if (err?.error) {
+        msg = err.error;
+      } else if (err?.message) {
+        msg = err.message;
+      } else if (err?.data?.error) {
+        msg = err.data.error;
+      } else if (err?.data?.message) {
+        msg = err.data.message;
       }
 
-
-      alert(
-        'Account created successfully. Please check your email to verify your account.'
-      )
-      navigation.navigate('Login')
-    } finally {
-      setLoading(false)
+      const lowMsg = msg.toLowerCase();
+      if (
+        lowMsg.includes('already') ||
+        lowMsg.includes('registered') ||
+        lowMsg.includes('exists') ||
+        lowMsg.includes('duplicate')
+      ) {
+        setErrorMessage(
+          'This email is already registered. Please use the login screen instead.'
+        )
+      } else {
+        setErrorMessage(msg)
+      }
     }
   }
 

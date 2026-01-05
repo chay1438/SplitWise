@@ -1,69 +1,102 @@
 import { supabase } from '../lib/supabase';
-import { Expense, ExpenseSplit } from '../lib/types';
+import { Expense, ExpenseWithDetails } from '../types';
 
 export const expenseService = {
-    /**
-     * Fetch expenses for a specific group.
-     * Includes the splits for each expense.
-     */
-    async fetchGroupExpenses(groupId: string) {
-        const { data, error } = await supabase
+    async getExpenses(filters: { groupId?: string; userId?: string }): Promise<ExpenseWithDetails[]> {
+        let query = supabase
             .from('expenses')
             .select(`
-        *,
-        expense_split (*)
-      `)
-            .eq('group_id', groupId)
-            .order('created_at', { ascending: false });
+            *,
+            payer:profiles!payer_id(*),
+            splits:expense_splits(
+              *,
+              user:profiles!user_id(*)
+            )
+          `)
+            .order('date', { ascending: false });
 
+        if (filters.groupId) query = query.eq('group_id', filters.groupId);
+
+        const { data, error } = await query;
         if (error) throw error;
 
-        // transform/validate if needed
-        return data;
+        let result = data as ExpenseWithDetails[];
+
+        if (filters.userId && !filters.groupId) {
+            result = result.filter(e =>
+                e.payer_id === filters.userId ||
+                e.splits.some(s => s.user_id === filters.userId)
+            );
+        }
+
+        return result;
     },
 
-    /**
-     * Create a new expense and its splits.
-     */
-    async createExpense(
-        groupId: string,
-        amount: number,
-        description: string,
-        splitType: 'EQUAL' | 'SELECTIVE' | 'INDIVIDUAL',
-        splits: { user_id: string; share_amount: number }[]
-    ) {
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError || !authData.user) throw new Error('User not authenticated');
-
-        // 1. Create expense
-        const { data: expenseData, error: expenseError } = await supabase
+    async createExpense(data: {
+        groupId?: string;
+        description: string;
+        amount: number;
+        date: string;
+        paidBy: string;
+        splits: { userId: string; amount: number }[];
+        userId: string;
+        receiptUrl?: string;
+        friendId?: string;
+    }): Promise<Expense> {
+        const { data: expense, error: expError } = await supabase
             .from('expenses')
             .insert({
-                group_id: groupId,
-                amount,
-                description,
-                split_type: splitType,
-                created_by: authData.user.id
+                group_id: data.groupId,
+                description: data.description,
+                amount: data.amount,
+                date: data.date,
+                payer_id: data.paidBy,
+                created_by: data.userId,
+                receipt_url: data.receiptUrl
             })
             .select()
             .single();
 
-        if (expenseError) throw expenseError;
+        if (expError) throw expError;
 
-        // 2. Create splits AND balances updates could go here or in trigger
-        // For now dealing with splits
-        const splitsToInsert = splits.map(s => ({
-            expense_id: expenseData.id,
-            user_id: s.user_id,
-            share_amount: s.share_amount
+        const splits = data.splits.map(s => ({
+            expense_id: expense.id,
+            user_id: s.userId,
+            amount: s.amount
         }));
-
-        const { error: splitError } = await supabase
-            .from('expense_split')
-            .insert(splitsToInsert);
-
+        const { error: splitError } = await supabase.from('expense_splits').insert(splits);
         if (splitError) throw splitError;
 
-        return expenseData;
+        return expense;
+    },
+
+    async deleteExpense(expenseId: string): Promise<void> {
+        // Splits should cascade delete if configured in DB, else delete them first.
+        const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
+        if (error) throw error;
+    },
+
+    async updateExpense(id: string, updates: Partial<Expense> & { splits?: { userId: string; amount: number }[] }) {
+        const { splits, ...expenseUpdates } = updates;
+
+        // Update Expense
+        if (Object.keys(expenseUpdates).length > 0) {
+            const { error } = await supabase.from('expenses').update(expenseUpdates).eq('id', id);
+            if (error) throw error;
+        }
+
+        // Update Splits if provided (Delete all and recreate is simplest)
+        if (splits) {
+            await supabase.from('expense_splits').delete().eq('expense_id', id);
+            const splitData = splits.map(s => ({
+                expense_id: id,
+                user_id: s.userId,
+                amount: s.amount
+            }));
+            const { error } = await supabase.from('expense_splits').insert(splitData);
+            if (error) throw error;
+        }
+
+        return { id, ...updates };
     }
 };

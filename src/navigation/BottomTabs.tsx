@@ -7,10 +7,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, Platform } from 'react-native';
 import { BottomTabParamList } from './types';
 
-// Placeholder screens for now
-const FriendsScreen = () => <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><Text>Friends</Text></View>;
-const ActivityScreen = () => <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><Text>Activity</Text></View>;
-const AccountScreen = () => <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><Text>Account</Text></View>;
+import FriendsScreen from '../screens/home/FriendsScreen';
+
+import AccountScreen from '../screens/home/AccountScreen';
+
+import ActivityScreen from '../screens/home/ActivityScreen';
 
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
@@ -22,7 +23,7 @@ export default function BottomTabs() {
             screenOptions={({ route }) => ({
                 headerShown: false,
                 tabBarIcon: ({ focused, color, size }) => {
-                    let iconName: keyof typeof Ionicons.glyphMap = 'home';
+                    let iconName: string = 'home';
 
                     if (route.name === 'Home') {
                         iconName = focused ? 'home' : 'home-outline';

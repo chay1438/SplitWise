@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, ViewStyle, StatusBar } from 'react-native';
 import { SafeAreaView, Edge } from 'react-native-safe-area-context';
-import { Colors, AppConfig } from '../../theme';
+import { Colors, AppConfig } from '../../constants/index';
 import LinearGradient from 'react-native-linear-gradient';
 
 interface ScreenWrapperProps {

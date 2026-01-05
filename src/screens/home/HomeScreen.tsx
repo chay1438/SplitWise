@@ -1,39 +1,66 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, RefreshControl } from 'react-native';
 import { ScreenWrapper } from '../../components/common/ScreenWrapper';
-import { Colors, AppConfig } from '../../theme';
+import { Colors, AppConfig } from '../../constants';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
-import { useAuth } from '../../hooks/useAuth';
+// Redux
+import { useAppDispatch } from '../../store/hooks';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
+import { useGetGroupsQuery } from '../../store/api/groupsApi';
+import { useGetExpensesQuery } from '../../store/api/expensesApi';
+import { useGetUserBalanceSummaryQuery } from '../../store/api/balanceApi';
+import { useGetFriendsQuery } from '../../store/api/friendsApi';
+import { Group } from '../../types';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
-import { groupService } from '../../services/groupService';
-import { balanceService } from '../../services/balanceService';
-import { Group } from '../../lib/types';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
 export default function HomeScreen() {
+    const dispatch = useAppDispatch();
     const navigation = useNavigation<NavigationProp>();
-    const { user } = useAuth();
+
+    // Selectors & Auth
+    const currentUser = useCurrentUser();
+
+    // RTK Query Hooks
+    // Note: We pass 'skip' if user.id is undefined to avoid firing early
+    const {
+        data: groups = [],
+        isLoading: groupsLoading,
+        refetch: refetchGroups
+    } = useGetGroupsQuery(currentUser.id || '', { skip: !currentUser.id });
+
+    const {
+        data: expenses = [],
+        isLoading: expensesLoading,
+        refetch: refetchExpenses
+    } = useGetExpensesQuery({ userId: currentUser.id }, { skip: !currentUser.id });
+
+    const {
+        data: balanceSummary,
+        isLoading: balanceLoading,
+        refetch: refetchBalance
+    } = useGetUserBalanceSummaryQuery(currentUser.id || '', { skip: !currentUser.id });
+
+    // State
     const [refreshing, setRefreshing] = useState(false);
 
-    // State for data
-    const [netBalance, setNetBalance] = useState(0);
-    const [youOwe, setYouOwe] = useState(567.58);
-    const [owesYou, setOwesYou] = useState(826.43);
-
-    const [pendingBills, setPendingBills] = useState([
-        { id: '1', title: 'Birthday House', date: 'Mar 24, 2025', amount: 4508.32, type: 'owe', icon: 'birthday-cake' },
-        { id: '2', title: 'You and Wade', date: 'Mar 22, 2025', amount: 3005.54, type: 'owed', icon: 'people' },
-        { id: '3', title: 'Shopping', date: 'Mar 24, 2025', amount: 505.00, type: 'owe', icon: 'cart' },
-    ]);
+    // Derived Balance State (using backend data now!)
+    const netBalance = balanceSummary?.netBalance || 0;
+    const youOwe = balanceSummary?.totalOwing || 0;
+    const owesYou = balanceSummary?.totalOwed || 0;
 
     const onRefresh = async () => {
         setRefreshing(true);
-        // Refresh logic here
-        await new Promise(r => setTimeout(r, 1000));
+        // Parallel Refetch
+        await Promise.all([
+            refetchGroups(),
+            refetchExpenses(),
+            refetchBalance()
+        ]);
         setRefreshing(false);
     }
 
@@ -44,9 +71,14 @@ export default function HomeScreen() {
                 <View style={styles.headerLeft}>
                     <Text style={styles.appName}>💰 Splitty</Text>
                 </View>
-                <TouchableOpacity style={styles.notificationButton}>
-                    <Ionicons name="notifications-outline" size={24} color="#fff" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row' }}>
+                    <TouchableOpacity style={[styles.notificationButton, { marginRight: 8 }]} onPress={() => navigation.navigate('Search' as any)}>
+                        <Ionicons name="search" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate('Notifications' as any)}>
+                        <Ionicons name="notifications-outline" size={24} color="#fff" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Balance Cards */}
@@ -90,7 +122,7 @@ export default function HomeScreen() {
                     icon="checkmark"
                     label="Settle Up"
                     color={Colors.success}
-                    onPress={() => { }}
+                    onPress={() => navigation.navigate('SettleUp' as any)}
                 />
                 <ActionButton
                     icon="people"
@@ -99,8 +131,56 @@ export default function HomeScreen() {
                     onPress={() => navigation.navigate('MakeGroup')}
                 />
             </View>
+
+            {/* Friends Section */}
+            <View style={{ marginTop: 24 }}>
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Friends</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('Friends' as any)}>
+                        <Ionicons name="chevron-forward" size={20} color="#999" />
+                    </TouchableOpacity>
+                </View>
+                {friends.length === 0 ? (
+                    <Text style={{ color: '#999', fontStyle: 'italic', marginTop: 8 }}>No friends yet. Add some!</Text>
+                ) : (
+                    friends.slice(0, 5).map(friend => (
+                        <TouchableOpacity
+                            key={friend.id}
+                            style={styles.billItem}
+                            onPress={() => navigation.navigate('FriendDetail' as any, { friendId: friend.id })}
+                        >
+                            <View style={styles.billIcon}>
+                                <Text style={{ fontWeight: 'bold', color: '#555' }}>
+                                    {friend.full_name?.charAt(0).toUpperCase()}
+                                </Text>
+                            </View>
+                            <View style={styles.billInfo}>
+                                <Text style={styles.billTitle}>{friend.full_name}</Text>
+                                <Text style={styles.billDate}>{friend.email}</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#ccc" />
+                        </TouchableOpacity>
+                    ))
+                )}
+            </View>
         </View>
     );
+
+    // Friends Query
+    const { data: friends = [] } = useGetFriendsQuery(currentUser.id || '', { skip: !currentUser.id });
+
+    // Recent Activity (derived from expenses)
+    const recentActivity = expenses
+        .slice(0, 5) // Top 5
+        .map(expense => ({
+            id: expense.id,
+            title: expense.description,
+            date: new Date(expense.date).toLocaleDateString(),
+            amount: expense.amount,
+            type: expense.payer_id === currentUser.id ? 'owed' : 'owe',
+            icon: 'receipt-outline'
+        }));
+
 
     return (
         <ScreenWrapper
@@ -109,7 +189,7 @@ export default function HomeScreen() {
             statusBarStyle="light-content"
         >
             <FlatList
-                data={pendingBills}
+                data={recentActivity}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                     <View style={styles.dashContent}>
@@ -127,21 +207,21 @@ export default function HomeScreen() {
                 contentContainerStyle={styles.scrollContent}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
                 showsVerticalScrollIndicator={false}
+                ListEmptyComponent={() => (
+                    <View style={[styles.dashContent, { padding: 40, alignItems: 'center' }]}>
+                        <Text style={{ color: '#999' }}>No recent activity</Text>
+                    </View>
+                )}
             />
         </ScreenWrapper>
     );
 }
 
 const BillItem = ({ title, date, amount, type, icon }: any) => {
-    const isFontAwesome = icon === 'birthday-cake';
     return (
         <View style={styles.billItem}>
             <View style={styles.billIcon}>
-                {isFontAwesome ? (
-                    <FontAwesome name={icon} size={20} color="#555" />
-                ) : (
-                    <Ionicons name={icon} size={24} color="#555" />
-                )}
+                <Ionicons name={icon} size={24} color="#555" />
             </View>
             <View style={styles.billInfo}>
                 <Text style={styles.billTitle}>{title}</Text>
@@ -230,7 +310,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#A93236',
     },
     owedCard: {
-        backgroundColor: '#FF8A8E',
+        backgroundColor: '#4CAF50', // Green for positive balance
     },
     balanceAmount: {
         fontSize: 24,
