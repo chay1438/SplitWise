@@ -112,8 +112,8 @@ export const contactService = {
         });
 
         // Step 6: Separate matched and unmatched contacts
-        const matchedPhones = matchedByPhone.map(u => u.phone_number);
-        const matchedEmails = matchedByEmail.map(u => u.email.toLowerCase());
+        const matchedPhones = matchedByPhone.map(u => u.phone_number || '');
+        const matchedEmails = matchedByEmail.map(u => (u.email || '').toLowerCase());
 
         const unmatched = deviceContacts.filter(contact => {
             // Check if phone is matched

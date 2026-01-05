@@ -19,6 +19,7 @@ export type AppStackParamList = {
     };
     Filter: { currentFilters?: any };
     CategorySelector: { onSelect: (category: string) => void };
+    AddGroupMember: { groupId?: string };
 };
 
 export type BottomTabParamList = {

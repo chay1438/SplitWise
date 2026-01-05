@@ -15,6 +15,7 @@ export interface Profile {
     email: string | null;
     full_name: string | null;
     avatar_url?: string | null;
+    phone_number?: string | null;
     updated_at?: string | null;
     created_at: string;
 }
@@ -211,6 +212,7 @@ export type RootStackParamList = {
     // Legacy / Transitional (Keep if needed until refactor)
     MakeGroup: undefined; // Alias for CreateGroup if needed
     GroupDetails: { groupId: string; groupName: string }; // Alias
+    AddGroupMember: { groupId?: string };
 };
 
 export type BottomTabParamList = {

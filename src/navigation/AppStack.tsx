@@ -6,6 +6,7 @@ import GroupDetailsScreen from '../screens/home/GroupDetailsScreen';
 import AddExpenseScreen from '../screens/home/AddExpenseScreen';
 import SettleUpScreen from '../screens/home/SettleUpScreen';
 import { AppStackParamList } from './types';
+import AddGroupMemberScreen from '../screens/groups/AddGroupMemberScreen';
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
@@ -80,6 +81,15 @@ export default function AppStack() {
                 name="EditExpense"
                 component={require('../screens/home/EditExpenseScreen').default}
                 options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="AddGroupMember"
+                component={AddGroupMemberScreen}
+                options={{
+                    title: 'Add Group Member',
+                    headerShown: true,
+                    headerBackTitle: 'Back'
+                }}
             />
         </Stack.Navigator>
     );

@@ -30,9 +30,14 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
         navigation.setOptions({
             title: groupName,
             headerRight: () => (
-                <TouchableOpacity onPress={() => navigation.navigate('EditGroup', { groupId })} style={{ marginRight: 10 }}>
-                    <Ionicons name="settings-outline" size={24} color={Colors.primary} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row' }}>
+                    <TouchableOpacity onPress={() => navigation.navigate('AddGroupMember', { groupId })} style={{ marginRight: 15 }}>
+                        <Ionicons name="person-add-outline" size={24} color={Colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('EditGroup', { groupId })} style={{ marginRight: 10 }}>
+                        <Ionicons name="settings-outline" size={24} color={Colors.primary} />
+                    </TouchableOpacity>
+                </View>
             )
         });
     }, [groupId, groupName]);

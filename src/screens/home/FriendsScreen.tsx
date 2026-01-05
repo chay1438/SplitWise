@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useGetFriendsQuery, useSearchUsersMutation, useAddFriendMutation } from '../../store/api/friendsApi';
+import { useGetFriendsQuery, useSearchUsersMutation, useSendFriendRequestMutation } from '../../store/api/friendsApi';
 import { useGetExpensesQuery } from '../../store/api/expensesApi';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { Profile } from '../../types';
@@ -26,7 +26,7 @@ export default function FriendsScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Profile[]>([]);
     const [searchUsers, { isLoading: searching }] = useSearchUsersMutation();
-    const [addFriend, { isLoading: addingFriend }] = useAddFriendMutation();
+    const [sendFriendRequest, { isLoading: addingFriend }] = useSendFriendRequestMutation();
 
     // Calculate Balances
     const friendBalances = useMemo(() => {
@@ -185,11 +185,11 @@ export default function FriendsScreen() {
                                         onPress={async () => {
                                             if (!currentUser.id) return;
                                             try {
-                                                await addFriend({ userId: currentUser.id, friendId: item.id }).unwrap();
-                                                Alert.alert("Success", `You are now friends with ${item.full_name}`);
+                                                await sendFriendRequest({ fromUserId: currentUser.id, toUserId: item.id }).unwrap();
+                                                Alert.alert("Success", `Friend request sent to ${item.full_name}`);
                                                 setSearchResults(prev => prev.filter(p => p.id !== item.id)); // Remove from list
                                             } catch (err: any) {
-                                                handleError(err, "Failed to add friend");
+                                                handleError(err, "Failed to send friend request");
                                             }
                                         }}>
                                         <Ionicons name="person-add-outline" size={24} color={Colors.primary} />

@@ -15,15 +15,17 @@ export const authApiSlice = apiSlice.injectEndpoints({
 
                     let userProfile: Profile | null = null;
                     if (session?.user) {
-                        const { data } = await supabase
+                        const { data, error } = await supabase
                             .from('profiles')
                             .select('*')
                             .eq('id', session.user.id)
                             .single();
+                        if (error) console.error('AuthApi: profile fetch error', error);
                         userProfile = data;
                     }
                     return { data: { session, user: userProfile } };
                 } catch (e: any) {
+                    console.error('AuthApi: initializeAuth error', e);
                     return { error: e.message };
                 }
             },
@@ -34,8 +36,9 @@ export const authApiSlice = apiSlice.injectEndpoints({
                     dispatch(setSession(data.session));
                     dispatch(setUser(data.user));
                 } catch (err) {
-                    console.error("Auth init failed", err);
+                    console.error("AuthApi: Auth init failed", err);
                 } finally {
+                    console.log('AuthApi: onQueryStarted finally (setting loading false)');
                     dispatch(setLoading(false));
                 }
             },
