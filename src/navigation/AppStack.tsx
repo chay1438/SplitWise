@@ -91,6 +91,11 @@ export default function AppStack() {
                     headerBackTitle: 'Back'
                 }}
             />
+            <Stack.Screen
+                name="AddFriend"
+                component={require('../screens/home/AddFriendScreen').default}
+                options={{ headerShown: false, presentation: 'modal' }}
+            />
         </Stack.Navigator>
     );
 }

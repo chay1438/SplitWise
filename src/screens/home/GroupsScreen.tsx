@@ -32,7 +32,11 @@ export default function GroupsScreen() {
         >
             <View style={styles.cardHeader}>
                 <View style={styles.groupIconContainer}>
-                    <Ionicons name="people" size={24} color="#fff" />
+                    {item.avatar_url ? (
+                        <Image source={{ uri: item.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                    ) : (
+                        <Ionicons name="people" size={24} color="#fff" />
+                    )}
                 </View>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.groupName}>{item.name}</Text>
@@ -43,20 +47,14 @@ export default function GroupsScreen() {
             </View>
 
             {/* Members Stack */}
+            {/* Footer with Creator Info */}
             <View style={styles.cardFooter}>
-                <View style={styles.avatarStack}>
-                    {item.members && item.members.slice(0, 4).map((member, index) => (
-                        <View key={member.id} style={[styles.avatarCircle, { marginLeft: index > 0 ? -10 : 0, zIndex: 10 - index }]}>
-                            <Text style={styles.avatarText}>{member.full_name?.charAt(0).toUpperCase()}</Text>
-                        </View>
-                    ))}
-                    {(item.members?.length || 0) > 4 && (
-                        <View style={[styles.avatarCircle, { marginLeft: -10, backgroundColor: '#eee', zIndex: 0 }]}>
-                            <Text style={[styles.avatarText, { color: '#666', fontSize: 10 }]}>+{item.members!.length - 4}</Text>
-                        </View>
-                    )}
-                </View>
-                {/* Placeholder for Balance Status */}
+                <Text style={styles.createdByText}>
+                    Created by: {item.members?.find(m => m.id === item.created_by)?.full_name || 'Guest'}
+                </Text>
+
+                {/* Optional: Keep 'View details' or remove if strictly 'only created by' is needed. 
+                    I'll keep it as a subtle link since it's a card. */}
                 <Text style={styles.settledStatus}>View details</Text>
             </View>
         </TouchableOpacity>
@@ -159,6 +157,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
+        overflow: 'hidden',
     },
     groupName: {
         fontSize: 18,
@@ -196,6 +195,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: 'bold',
         color: '#555',
+    },
+    createdByText: {
+        fontSize: 14,
+        color: '#666',
+        fontStyle: 'italic',
     },
     settledStatus: {
         fontSize: 12,

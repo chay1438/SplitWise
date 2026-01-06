@@ -10,8 +10,10 @@ import { useAppDispatch } from '../../store/hooks';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { useGetGroupsQuery } from '../../store/api/groupsApi';
 import { useGetExpensesQuery } from '../../store/api/expensesApi';
-import { useGetUserBalanceSummaryQuery } from '../../store/api/balanceApi';
+import { useGetUserBalanceSummaryQuery, useGetBalancesQuery } from '../../store/api/balanceApi';
 import { useGetFriendsQuery } from '../../store/api/friendsApi';
+import { GroupListItem } from '../../components/common/GroupListItem';
+
 import { Group } from '../../types';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
@@ -97,7 +99,7 @@ export default function HomeScreen() {
             <View style={styles.dashboardContainer}>
                 <View style={styles.dashboard}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Pending Bills</Text>
+                        <Text style={styles.sectionTitle}>My Groups</Text>
                         <TouchableOpacity>
                             <Text style={styles.seeAll}>View All</Text>
                         </TouchableOpacity>
@@ -131,56 +133,28 @@ export default function HomeScreen() {
                     onPress={() => navigation.navigate('MakeGroup')}
                 />
             </View>
-
-            {/* Friends Section */}
-            <View style={{ marginTop: 24 }}>
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Friends</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Friends' as any)}>
-                        <Ionicons name="chevron-forward" size={20} color="#999" />
-                    </TouchableOpacity>
-                </View>
-                {friends.length === 0 ? (
-                    <Text style={{ color: '#999', fontStyle: 'italic', marginTop: 8 }}>No friends yet. Add some!</Text>
-                ) : (
-                    friends.slice(0, 5).map(friend => (
-                        <TouchableOpacity
-                            key={friend.id}
-                            style={styles.billItem}
-                            onPress={() => navigation.navigate('FriendDetail' as any, { friendId: friend.id })}
-                        >
-                            <View style={styles.billIcon}>
-                                <Text style={{ fontWeight: 'bold', color: '#555' }}>
-                                    {friend.full_name?.charAt(0).toUpperCase()}
-                                </Text>
-                            </View>
-                            <View style={styles.billInfo}>
-                                <Text style={styles.billTitle}>{friend.full_name}</Text>
-                                <Text style={styles.billDate}>{friend.email}</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={20} color="#ccc" />
-                        </TouchableOpacity>
-                    ))
-                )}
-            </View>
         </View>
     );
 
-    // Friends Query
-    const { data: friends = [] } = useGetFriendsQuery(currentUser.id || '', { skip: !currentUser.id });
+    // Balances Query (Group Level)
+    const { data: balanceData = [] } = useGetBalancesQuery(currentUser.id || '', { skip: !currentUser.id });
 
-    // Recent Activity (derived from expenses)
-    const recentActivity = expenses
-        .slice(0, 5) // Top 5
-        .map(expense => ({
-            id: expense.id,
-            title: expense.description,
-            date: new Date(expense.date).toLocaleDateString(),
-            amount: expense.amount,
-            type: expense.payer_id === currentUser.id ? 'owed' : 'owe',
-            icon: 'receipt-outline'
-        }));
+    // Merge Groups with Balances
+    const groupsWithBalances = React.useMemo(() => {
+        return groups.map((group, index) => {
+            const balRecord = balanceData.find((b: any) => b.group_id === group.id);
+            const rawAmount = balRecord ? parseFloat(balRecord.net_balance) : 0;
 
+            // Use consistent group color
+            const color = '#FF8A8E';
+
+            return {
+                ...group,
+                balance: rawAmount,
+                color
+            };
+        });
+    }, [groups, balanceData]);
 
     return (
         <ScreenWrapper
@@ -189,16 +163,17 @@ export default function HomeScreen() {
             statusBarStyle="light-content"
         >
             <FlatList
-                data={recentActivity}
+                data={groupsWithBalances}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                     <View style={styles.dashContent}>
-                        <BillItem
-                            title={item.title}
-                            date={item.date}
-                            amount={item.amount}
-                            type={item.type}
-                            icon={item.icon}
+                        <GroupListItem
+                            title={item.name}
+                            amount={item.balance}
+                            color={item.color}
+                            members={item.members}
+                            imageUrl={item.avatar_url}
+                            onPress={() => navigation.navigate('GroupDetails', { groupId: item.id, groupName: item.name })}
                         />
                     </View>
                 )}
@@ -209,7 +184,7 @@ export default function HomeScreen() {
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={() => (
                     <View style={[styles.dashContent, { padding: 40, alignItems: 'center' }]}>
-                        <Text style={{ color: '#999' }}>No recent activity</Text>
+                        <Text style={{ color: '#999' }}>No Groups yet. Create one!</Text>
                     </View>
                 )}
             />

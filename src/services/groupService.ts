@@ -33,13 +33,14 @@ export const groupService = {
         })) as GroupWithMembers[];
     },
 
-    async createGroup(data: { name: string; type: string; createdBy: string; memberIds?: string[] }): Promise<Group> {
+    async createGroup(data: { name: string; type: string; createdBy: string; memberIds?: string[]; avatar_url?: string }): Promise<Group> {
         const { data: group, error } = await supabase
             .from('groups')
             .insert({
                 name: data.name,
                 type: data.type,
-                created_by: data.createdBy
+                created_by: data.createdBy,
+                avatar_url: data.avatar_url
             })
             .select()
             .single();
@@ -66,7 +67,7 @@ export const groupService = {
         if (error) throw error;
     },
 
-    async updateGroup(groupId: string, data: { name?: string; type?: string }): Promise<void> {
+    async updateGroup(groupId: string, data: { name?: string; type?: string; avatar_url?: string }): Promise<void> {
         const { error } = await supabase
             .from('groups')
             .update(data)

@@ -112,7 +112,7 @@ export default function FriendsScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Friends</Text>
-                <TouchableOpacity onPress={() => setShowSearch(true)}>
+                <TouchableOpacity onPress={() => navigation.navigate('AddFriend')}>
                     <Ionicons name="person-add" size={24} color={Colors.primary} />
                 </TouchableOpacity>
             </View>
@@ -137,76 +137,6 @@ export default function FriendsScreen() {
                     }
                 />
             )}
-
-            {/* Search/Add Friend Modal */}
-            <Modal
-                visible={showSearch}
-                animationType="slide"
-                presentationStyle="pageSheet"
-                onRequestClose={() => setShowSearch(false)}
-            >
-                <SafeAreaView style={styles.modalContainer}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Find People</Text>
-                        <TouchableOpacity onPress={() => setShowSearch(false)}>
-                            <Text style={styles.closeButton}>Close</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.searchBoxContainer}>
-                        <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Name or email..."
-                            value={searchQuery}
-                            onChangeText={handleSearch}
-                            autoCapitalize="none"
-                        />
-                    </View>
-
-                    {searching ? (
-                        <ActivityIndicator style={{ marginTop: 20 }} color={Colors.primary} />
-                    ) : (
-                        <FlatList
-                            data={searchResults}
-                            keyExtractor={item => item.id}
-                            renderItem={({ item }) => (
-                                <View style={styles.userItem}>
-                                    <View style={styles.avatarSmall}>
-                                        <Text style={styles.avatarTextSmall}>{(item.full_name || item.email || '?').charAt(0).toUpperCase()}</Text>
-                                    </View>
-                                    <View style={styles.info}>
-                                        <Text style={styles.name}>{item.full_name || item.email}</Text>
-                                        <Text style={styles.email}>{item.email}</Text>
-                                    </View>
-                                    {/* Action: Add Friend */}
-                                    <TouchableOpacity
-                                        disabled={addingFriend}
-                                        onPress={async () => {
-                                            if (!currentUser.id) return;
-                                            try {
-                                                await sendFriendRequest({ fromUserId: currentUser.id, toUserId: item.id }).unwrap();
-                                                Alert.alert("Success", `Friend request sent to ${item.full_name}`);
-                                                setSearchResults(prev => prev.filter(p => p.id !== item.id)); // Remove from list
-                                            } catch (err: any) {
-                                                handleError(err, "Failed to send friend request");
-                                            }
-                                        }}>
-                                        <Ionicons name="person-add-outline" size={24} color={Colors.primary} />
-                                    </TouchableOpacity>
-                                </View>
-                            )}
-                            ListEmptyComponent={
-                                searchQuery.length > 2 ? (
-                                    <Text style={styles.noResults}>No users found.</Text>
-                                ) : (
-                                    <Text style={styles.helpText}>Search for people on SplitWise.</Text>
-                                )
-                            }
-                        />
-                    )}
-                </SafeAreaView>
-            </Modal>
         </SafeAreaView>
     );
 }

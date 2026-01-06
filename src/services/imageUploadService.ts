@@ -1,6 +1,4 @@
 import { supabase } from '../lib/supabase';
-import * as FileSystem from 'expo-file-system';
-import { decode } from 'base64-arraybuffer';
 
 export const uploadImageToSupabase = async (uri: string, bucketName: string = 'receipts'): Promise<string | null> => {
     try {
@@ -8,13 +6,14 @@ export const uploadImageToSupabase = async (uri: string, bucketName: string = 'r
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
-        const base64 = await FileSystem.readAsStringAsync(uri, {
-            encoding: 'base64',
-        });
+        // Modern Approach: Fetch the local URI to get a Blob (Binary Large Object)
+        // This is more efficient than Base64 string reading
+        const response = await fetch(uri);
+        const blob = await response.blob();
 
         const { data, error } = await supabase.storage
             .from(bucketName)
-            .upload(filePath, decode(base64), {
+            .upload(filePath, blob, {
                 contentType: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
                 upsert: false
             });

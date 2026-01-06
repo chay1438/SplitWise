@@ -27,6 +27,7 @@ export interface Group {
     created_by: string; // uuid
     created_at: string;
     updated_at: string;
+    avatar_url?: string;
 }
 
 export interface GroupMember {

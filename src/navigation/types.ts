@@ -20,6 +20,7 @@ export type AppStackParamList = {
     Filter: { currentFilters?: any };
     CategorySelector: { onSelect: (category: string) => void };
     AddGroupMember: { groupId?: string };
+    AddFriend: undefined;
 };
 
 export type BottomTabParamList = {

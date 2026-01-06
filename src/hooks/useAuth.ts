@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Alert } from 'react-native';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectUser, selectSession, selectIsLoading, setSession, setUser, setLoading } from '../store/slices/authSlice';
@@ -13,6 +13,7 @@ export function useAuth() {
   const user = useAppSelector(selectUser);
   const session = useAppSelector(selectSession);
   const isLoadingStore = useAppSelector(selectIsLoading);
+  const [forceEntry, setForceEntry] = React.useState(false);
 
   // Initial auth check
   const {
@@ -95,6 +96,7 @@ export function useAuth() {
         if (isLoadingStore || isInitLoading) {
           console.warn('Auth loading timed out - forcing app entry');
           dispatch(setLoading(false));
+          setForceEntry(true);
         }
       }, 5000); // 5 seconds timeout
       return () => clearTimeout(timer);
@@ -105,7 +107,7 @@ export function useAuth() {
     session,
     user,
     profile: user,
-    loading: isLoadingStore || isInitLoading,
+    loading: (isLoadingStore || isInitLoading) && !forceEntry,
     isAuthenticated: !!session,
     refreshSession: refetch
   };

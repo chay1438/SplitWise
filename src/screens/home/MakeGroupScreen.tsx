@@ -16,6 +16,10 @@ import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { handleError } from '../../lib/errorHandler';
 import { supabase } from '../../lib/supabase';
 
+// Image Upload
+import * as ImagePicker from 'expo-image-picker';
+import { uploadImageToSupabase } from '../../services/imageUploadService';
+
 export default function MakeGroupScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
     const route = useRoute<MakeGroupRouteProp | EditGroupRouteProp>();
@@ -42,11 +46,18 @@ export default function MakeGroupScreen() {
     const [type, setType] = useState('Trip');
     const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
 
+    // Image State
+    const [groupImage, setGroupImage] = useState<string | null>(null);
+    const [uploadingImage, setUploadingImage] = useState(false);
+
     // Pre-fill
     useEffect(() => {
         if (isEditMode && group) {
             setName(group.name);
             setType(group.type);
+            // Assuming group object might have image_url/avatar_url globally in future, 
+            // but currently types don't support it strictly. 
+            // If it did: setGroupImage(group.avatar_url);
             if (group.members) {
                 setSelectedFriends(new Set(group.members.map(m => m.id)));
             }
@@ -65,6 +76,26 @@ export default function MakeGroupScreen() {
         { id: 'Other', icon: 'list', label: 'Other' },
     ];
 
+    const handlePickImage = async () => {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (permissionResult.granted === false) {
+            Alert.alert("Permission Required", "Permission to access camera roll is required!");
+            return;
+        }
+
+        const pickerResult = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1], // Square for group icon
+            quality: 0.5,
+        });
+
+        if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets.length > 0) {
+            setGroupImage(pickerResult.assets[0].uri);
+        }
+    };
+
     const handleSubmit = async () => {
         if (!name.trim()) {
             Alert.alert("Error", "Please enter a group name");
@@ -77,6 +108,16 @@ export default function MakeGroupScreen() {
         }
 
         try {
+            setUploadingImage(true);
+
+            // Upload Image if present
+            let finalImageUrl = undefined;
+            if (groupImage && !groupImage.startsWith('http')) {
+                finalImageUrl = await uploadImageToSupabase(groupImage, 'avatars');
+            } else if (groupImage) {
+                finalImageUrl = groupImage; // Existing URL
+            }
+
             // Self-healing: Ensure profile exists
             if (currentUser.session?.user) {
                 const u = currentUser.session.user;
@@ -92,7 +133,9 @@ export default function MakeGroupScreen() {
                 await updateGroup({
                     groupId,
                     name,
-                    type
+                    type,
+                    // @ts-ignore
+                    avatar_url: finalImageUrl
                 }).unwrap();
 
                 // 2. Add New Members
@@ -113,11 +156,15 @@ export default function MakeGroupScreen() {
                     name,
                     type,
                     createdBy: currentUser.id,
-                    memberIds: Array.from(selectedFriends)
+                    memberIds: Array.from(selectedFriends),
+                    // @ts-ignore
+                    imageUrl: finalImageUrl
                 }).unwrap();
             }
+            setUploadingImage(false);
             navigation.goBack();
         } catch (error: any) {
+            setUploadingImage(false);
             handleError(error, "Failed to save group");
         }
     };
@@ -157,8 +204,8 @@ export default function MakeGroupScreen() {
                     <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>New Group</Text>
-                <TouchableOpacity onPress={handleSubmit} disabled={isCreating || isUpdating}>
-                    {isCreating || isUpdating ? <ActivityIndicator color={Colors.primary} /> : <Text style={styles.saveText}>Save</Text>}
+                <TouchableOpacity onPress={handleSubmit} disabled={isCreating || isUpdating || uploadingImage}>
+                    {isCreating || isUpdating || uploadingImage ? <ActivityIndicator color={Colors.primary} /> : <Text style={styles.saveText}>Save</Text>}
                 </TouchableOpacity>
             </View>
 
@@ -167,8 +214,12 @@ export default function MakeGroupScreen() {
                 {/* Group Details */}
                 <View style={styles.section}>
                     <View style={styles.inputRow}>
-                        <TouchableOpacity style={styles.photoButton}>
-                            <Ionicons name="camera-outline" size={24} color="#666" />
+                        <TouchableOpacity style={styles.photoButton} onPress={handlePickImage} disabled={uploadingImage}>
+                            {groupImage ? (
+                                <Image source={{ uri: groupImage }} style={{ width: '100%', height: '100%', borderRadius: 8 }} />
+                            ) : (
+                                <Ionicons name="camera-outline" size={24} color="#666" />
+                            )}
                         </TouchableOpacity>
                         <TextInput
                             style={styles.nameInput}
