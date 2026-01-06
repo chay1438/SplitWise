@@ -37,6 +37,11 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
     const group = groups.find(g => g.id === groupId);
     const members = group?.members || [];
 
+    // Helper to stabilize expenses dependency
+    const expensesHash = useMemo(() => {
+        return expensesPage.map(e => e.id + e.updated_at).join(',');
+    }, [expensesPage]);
+
     // --- DATA SYNC LOGIC ---
     useEffect(() => {
         if (expensesPage) {
@@ -56,7 +61,7 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
                 });
             }
         }
-    }, [expensesPage, page]);
+    }, [expensesHash, page]);
 
     // Handle "Pull to Refresh" or "Focus" updates
     // If we add an expense, invalidation happens. 
@@ -223,7 +228,7 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
         return (
             <TouchableOpacity
                 style={styles.expenseItem}
-                onPress={() => navigation.navigate('EditExpense', { expenseId: item.id, groupId: groupId })}
+                onPress={() => navigation.navigate('ExpenseDetail', { expense: item })}
             >
                 <View style={styles.dateBox}>
                     <Text style={styles.dateMonth}>{new Date(item.date).toLocaleString('default', { month: 'short' })}</Text>

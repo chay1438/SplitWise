@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Modal, FlatList, Image } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
-import { Profile, SplitType, ExpenseWithDetails, Group } from '../../types';
+import { SplitType } from '../../types';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { useCreateExpenseMutation, useUpdateExpenseMutation, useDeleteExpenseMutation, useGetExpensesQuery } from '../../store/api/expensesApi';
@@ -16,7 +16,7 @@ type Props = NativeStackScreenProps<AppStackParamList, 'AddExpense' | 'EditExpen
 
 export default function AddExpenseScreen({ route, navigation }: Props) {
     const params = (route.params || {}) as any;
-    const { groupId: initialGroupId, groupName, expenseId } = params;
+    const { groupId: initialGroupId, expenseId } = params;
 
     // Determine Mode
     const isEditing = !!expenseId;
@@ -43,8 +43,7 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
     const members = useMemo(() => selectedGroup?.members || [], [selectedGroup]);
     const memberIdsString = useMemo(() => members.map(m => m.id).sort().join(','), [members]);
 
-    // Existing Expense (if editing) - we need it to prefill
-    // Note: We need to fetch expenses for the group if we are editing
+    // Existing Expense (if editing)
     const { data: expenses } = useGetExpensesQuery(
         { groupId: selectedGroupId },
         { skip: !selectedGroupId || !isEditing }
@@ -60,7 +59,6 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
     const [amount, setAmount] = useState('');
     const [date, setDate] = useState(new Date());
     const [payerId, setPayerId] = useState(userId);
-
     const [receiptImage, setReceiptImage] = useState<string | null>(null);
     const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -69,8 +67,11 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
 
     // Split State
     const [splitType, setSplitType] = useState<SplitType>('EQUAL');
-    const [splitValues, setSplitValues] = useState<Record<string, string>>({});
     const [involvedUserIds, setInvolvedUserIds] = useState<string[]>([]);
+    // Exact Amounts
+    const [splitValues, setSplitValues] = useState<Record<string, string>>({});
+    // Percentage Values (0-100)
+    const [splitPercentages, setSplitPercentages] = useState<Record<string, string>>({});
 
     // Modals
     const [showPayerModal, setShowPayerModal] = useState(false);
@@ -94,7 +95,7 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                 }
             }
         }
-    }, [memberIdsString, userId, isEditing]); // Depend on STABLE string hash
+    }, [memberIdsString, userId, isEditing]);
 
 
     // Init from Existing Expense (EDIT MODE)
@@ -103,7 +104,6 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
             setDescription(existingExpense.description);
             setAmount(existingExpense.amount.toString());
             setPayerId(existingExpense.payer_id);
-
             setDate(new Date(existingExpense.date));
             setReceiptImage(existingExpense.receipt_url || null);
             setImageDeleted(false);
@@ -130,6 +130,7 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
             setSplitType(detectedType);
             setInvolvedUserIds(involved.length > 0 ? involved : members.map(m => m.id));
             setSplitValues(values);
+            // We don't restore Percentages from DB as DB only has amounts. defaulting to Individual is safer.
         }
     }, [existingExpense, members, isEditing]);
 
@@ -223,6 +224,31 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
             if (Math.abs(sum - totalAmount) > 0.05) {
                 Alert.alert("Error", `Detail amounts ($${sum.toFixed(2)}) do not match total ($${totalAmount.toFixed(2)})`);
                 return;
+            }
+            finalSplits = splits;
+        } else if (splitType === 'PERCENTAGE') {
+            let totalPercent = 0;
+            const splits = members.map(m => {
+                const pct = parseFloat(splitPercentages[m.id] || '0');
+                totalPercent += pct;
+                const val = (totalAmount * pct) / 100;
+                return { userId: m.id, amount: parseFloat(val.toFixed(2)) };
+            }).filter(s => s.amount > 0);
+
+            if (Math.abs(totalPercent - 100) > 0.1) {
+                Alert.alert("Error", `Percentages (${totalPercent}%) must add up to 100%`);
+                return;
+            }
+
+            // Re-verify sum of amounts due to rounding
+            const sumAmounts = splits.reduce((acc, curr) => acc + curr.amount, 0);
+            if (Math.abs(sumAmounts - totalAmount) > 0.05) {
+                // Adjust last remaining cent to match perfectly
+                if (splits.length > 0) {
+                    const diff = totalAmount - sumAmounts;
+                    splits[0].amount += diff;
+                    splits[0].amount = parseFloat(splits[0].amount.toFixed(2));
+                }
             }
             finalSplits = splits;
         }
@@ -352,6 +378,19 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                     <Text style={styles.modalTitle}>Split Options</Text>
                     <TouchableOpacity onPress={() => setShowSplitModal(false)}><Text style={styles.closeText}>Done</Text></TouchableOpacity>
                 </View>
+
+                {/* New Feature: Add Friend to Group Link */}
+                <TouchableOpacity
+                    style={styles.addMemberLink}
+                    onPress={() => {
+                        setShowSplitModal(false);
+                        if (selectedGroupId) navigation.navigate('AddGroupMember', { groupId: selectedGroupId });
+                    }}
+                >
+                    <Ionicons name="person-add-outline" size={20} color={Colors.primary} />
+                    <Text style={styles.addMemberText}>Add person to group</Text>
+                </TouchableOpacity>
+
                 <View style={styles.tabContainer}>
                     <TouchableOpacity onPress={() => setSplitType('EQUAL')} style={[styles.tab, splitType === 'EQUAL' && styles.activeTab]}>
                         <Text style={[styles.tabText, splitType === 'EQUAL' && styles.activeTabText]}>Equal</Text>
@@ -359,7 +398,11 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                     <TouchableOpacity onPress={() => setSplitType('INDIVIDUAL')} style={[styles.tab, splitType === 'INDIVIDUAL' && styles.activeTab]}>
                         <Text style={[styles.tabText, splitType === 'INDIVIDUAL' && styles.activeTabText]}>Exact</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setSplitType('PERCENTAGE')} style={[styles.tab, splitType === 'PERCENTAGE' && styles.activeTab]}>
+                        <Text style={[styles.tabText, splitType === 'PERCENTAGE' && styles.activeTabText]}>%</Text>
+                    </TouchableOpacity>
                 </View>
+
                 <ScrollView style={{ marginTop: 10 }}>
                     {members.map(member => (
                         <View key={member.id} style={styles.splitMemberRow}>
@@ -369,6 +412,7 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                                 </View>
                                 <Text style={styles.memberName}>{member.id === userId ? 'You' : member.full_name}</Text>
                             </View>
+
                             {splitType === 'EQUAL' && (
                                 <TouchableOpacity onPress={() => {
                                     if (involvedUserIds.includes(member.id)) {
@@ -380,6 +424,7 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                                     <Ionicons name={involvedUserIds.includes(member.id) ? "checkbox" : "square-outline"} size={24} color={Colors.primary} />
                                 </TouchableOpacity>
                             )}
+
                             {splitType === 'INDIVIDUAL' && (
                                 <View style={styles.amountInputWrapper}>
                                     <Text style={styles.currencySymbol}>$</Text>
@@ -392,9 +437,50 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                                     />
                                 </View>
                             )}
+
+                            {splitType === 'PERCENTAGE' && (
+                                <View style={styles.amountInputWrapper}>
+                                    <TextInput
+                                        style={styles.exactInput}
+                                        placeholder="0"
+                                        keyboardType="numeric"
+                                        value={splitPercentages[member.id] || ''}
+                                        onChangeText={text => setSplitPercentages({ ...splitPercentages, [member.id]: text })}
+                                    />
+                                    <Text style={styles.currencySymbol}>%</Text>
+                                </View>
+                            )}
                         </View>
                     ))}
                 </ScrollView>
+
+                {/* Live Split Summary */}
+                <View style={[styles.splitFooter,
+                (splitType === 'INDIVIDUAL' || splitType === 'PERCENTAGE') &&
+                    ((splitType === 'INDIVIDUAL' && Math.abs((Object.values(splitValues).reduce((s, v) => s + (parseFloat(v) || 0), 0)) - (parseFloat(amount) || 0)) > 0.05) ||
+                        (splitType === 'PERCENTAGE' && Math.abs((Object.values(splitPercentages).reduce((s, v) => s + (parseFloat(v) || 0), 0)) - 100) > 0.1))
+                    ? styles.splitFooterError : styles.splitFooterSuccess
+                ]}>
+                    <Text style={styles.splitFooterText}>
+                        {(() => {
+                            const totalAmt = parseFloat(amount) || 0;
+                            if (splitType === 'EQUAL') {
+                                const count = involvedUserIds.length;
+                                return count > 0 ? `$${(totalAmt / count).toFixed(2)} / person` : 'Select people';
+                            }
+                            if (splitType === 'INDIVIDUAL') {
+                                const currentSum = Object.values(splitValues).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+                                const left = totalAmt - currentSum;
+                                return `Entered: $${currentSum.toFixed(2)} of $${totalAmt.toFixed(2)}\nRemaining: $${left.toFixed(2)}`;
+                            }
+                            if (splitType === 'PERCENTAGE') {
+                                const currentPct = Object.values(splitPercentages).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+                                const left = 100 - currentPct;
+                                return `Total: ${currentPct.toFixed(1)}% / 100%\nRemaining: ${left.toFixed(1)}%`;
+                            }
+                        })()}
+                    </Text>
+                </View>
             </View>
         </Modal>
     );
@@ -416,7 +502,7 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
 
             <ScrollView contentContainerStyle={styles.content}>
 
-                {/* Group Selector (New) */}
+                {/* Group Selector */}
                 <TouchableOpacity
                     style={styles.groupSelector}
                     onPress={() => !isEditing && setShowGroupModal(true)}
@@ -471,12 +557,16 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                         <Text style={styles.summaryText}>and split</Text>
                         <TouchableOpacity onPress={() => setShowSplitModal(true)} style={styles.pill}>
                             <Text style={styles.pillText}>
-                                {splitType === 'EQUAL' ? 'equally' : 'unequally'}
+                                {splitType === 'EQUAL' ? 'equally' : splitType === 'PERCENTAGE' ? 'by %' : 'unequally'}
                             </Text>
                         </TouchableOpacity>
                     </View>
                 ) : (
-                    <Text style={{ textAlign: 'center', color: '#999', fontStyle: 'italic' }}>Select a group to split expenses</Text>
+                    <TouchableOpacity onPress={() => Alert.alert('Attention', 'Please select a group first')} style={{ padding: 10 }}>
+                        <Text style={{ textAlign: 'center', color: Colors.primary, fontStyle: 'italic', textDecorationLine: 'underline' }}>
+                            Select a group to split expenses
+                        </Text>
+                    </TouchableOpacity>
                 )}
 
                 {/* Date Display (Read only for now) */}
@@ -566,4 +656,10 @@ const styles = StyleSheet.create({
     exactInput: { fontSize: 16, flex: 1, textAlign: 'right' },
     deleteBtn: { backgroundColor: '#FFEBEE', padding: 16, borderRadius: 12, alignItems: 'center' },
     deleteText: { color: Colors.error, fontWeight: 'bold' },
+    addMemberLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 10, backgroundColor: '#f9f9f9', marginBottom: 10 },
+    addMemberText: { color: Colors.primary, marginLeft: 8, fontWeight: '600' },
+    splitFooter: { padding: 16, backgroundColor: '#f0f9ff', borderTopWidth: 1, borderTopColor: '#e0e0e0', alignItems: 'center' },
+    splitFooterError: { backgroundColor: '#fff0f0' },
+    splitFooterSuccess: { backgroundColor: '#f0f9ff' },
+    splitFooterText: { fontSize: 16, fontWeight: 'bold', textAlign: 'center', color: '#333' },
 });

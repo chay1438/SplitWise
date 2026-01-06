@@ -121,7 +121,7 @@ export interface ExpenseWithDetails extends Expense {
 // ==========================================
 
 // Matches existing code usage.
-export type SplitType = 'EQUAL' | 'SELECTIVE' | 'INDIVIDUAL';
+export type SplitType = 'EQUAL' | 'SELECTIVE' | 'INDIVIDUAL' | 'PERCENTAGE';
 
 export interface ExpenseFormData {
     description: string;
