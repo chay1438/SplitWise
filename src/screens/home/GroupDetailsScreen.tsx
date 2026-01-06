@@ -17,13 +17,74 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
     const currentUser = useCurrentUser();
     const currentUserId = currentUser.id;
 
-    // RTK Query
-    // Force refetchOnMount logic via tags invalidation usually, but simpler to rely on cache
-    const { data: expenses = [], isLoading: isLoadingExpenses } = useGetExpensesQuery({ groupId });
-    const { data: groups = [] } = useGetGroupsQuery(currentUser.id || '', { skip: !currentUser.id });
+    // --- INFINITE SCROLL STATE ---
+    const [page, setPage] = useState(0);
+    const [allExpenses, setAllExpenses] = useState<ExpenseWithDetails[]>([]);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const limit = 20;
 
+    // RTK Query
+    // We fetch based on current 'page'.
+    // When 'data' arrives, we verify if it's new and append it.
+    const { data: expensesPage = [], isLoading: isLoadingExpenses, isFetching, refetch } = useGetExpensesQuery({
+        groupId,
+        page,
+        limit
+    });
+
+    // Group Info
+    const { data: groups = [] } = useGetGroupsQuery(currentUser.id || '', { skip: !currentUser.id });
     const group = groups.find(g => g.id === groupId);
     const members = group?.members || [];
+
+    // --- DATA SYNC LOGIC ---
+    useEffect(() => {
+        if (expensesPage) {
+            if (page === 0) {
+                // Reset/Initial Load
+                setAllExpenses(expensesPage);
+            } else if (expensesPage.length > 0) {
+                // Append (Filtering duplicates just in case)
+                setAllExpenses(prev => {
+                    const newIds = new Set(expensesPage.map(e => e.id));
+                    return [...prev, ...expensesPage.filter(e => !newIds.has(e.id))]; // Simple dedup relies on caching, checking ID is safer
+                    // Actually, simpler append is usually fine if pages are stable
+                    // But to be safe against race conditions:
+                    const existingIds = new Set(prev.map(e => e.id));
+                    const uniqueNew = expensesPage.filter(e => !existingIds.has(e.id));
+                    return [...prev, ...uniqueNew];
+                });
+            }
+        }
+    }, [expensesPage, page]);
+
+    // Handle "Pull to Refresh" or "Focus" updates
+    // If we add an expense, invalidation happens. 
+    // We should probably reset to Page 0 to see the new item (date desc).
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            // Optional: Silent refresh or reset?
+            // Let's rely on RTK Tags for hard data updates.
+            // If user added expense, standard tag invalidation triggers.
+            // We might want to reset pagination to 0 to ensure coherence.
+            // setPage(0); // This would force reload top.
+        });
+        return unsubscribe;
+    }, [navigation]);
+
+    const handleLoadMore = () => {
+        if (!isFetching && expensesPage.length === limit) {
+            // If we got a full page, there might be more
+            setPage(prev => prev + 1);
+        }
+    };
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        setPage(0);
+        await refetch();
+        setIsRefreshing(false);
+    };
 
     // Navigation Options
     useEffect(() => {
@@ -42,47 +103,37 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
         });
     }, [groupId, groupName]);
 
-    // --- LOGIC: Balance Calculation ---
-    // 1. Calculate how much YOU owe or are owed in TOTAL in this group.
-    // 2. Calculate individual debts ("Alice owes you $10").
 
+    // --- LOGIC: Balance Calculation (Client Side on Loaded Data) ---
+    // Note: This only calculates balance for LOADED items.
     const { myTotalBalance, debts } = useMemo(() => {
         if (!currentUserId) return { myTotalBalance: 0, debts: [] };
 
         let total = 0;
-        const balanceMap: Record<string, number> = {}; // userId -> amount (positive = they owe me)
+        const balanceMap: Record<string, number> = {};
 
-        expenses.forEach((expense: any) => {
+        allExpenses.forEach((expense: any) => {
             const amount = parseFloat(expense.amount);
             const isPayer = expense.payer_id === currentUserId;
 
-            if (expense.expense_splits) {
-                expense.expense_splits.forEach((split: any) => {
+            if (expense.splits) {
+                expense.splits.forEach((split: any) => {
                     const splitAmount = parseFloat(split.amount);
                     const isSplitter = split.user_id === currentUserId;
 
                     if (isPayer && split.user_id !== currentUserId) {
-                        // I paid, they owe me
                         balanceMap[split.user_id] = (balanceMap[split.user_id] || 0) + splitAmount;
                         total += splitAmount;
                     } else if (!isPayer && isSplitter) {
-                        // Someone else paid, I owe them (if payer is them)
-                        if (expense.payer_id === split.user_id) {
-                            // Self-split logic (unusual but possible in some apps)
-                        } else {
-                            // I owe the payer
+                        if (expense.payer_id !== split.user_id) {
                             balanceMap[expense.payer_id] = (balanceMap[expense.payer_id] || 0) - splitAmount;
                             total -= splitAmount;
                         }
                     }
                 });
-            } else {
-                // Legacy/Simple split fallback (Assuming Equal Split among all members if no split data)
-                // This is dangerous without precise member count at time of expense, skipping for now to avoid bugs
             }
         });
 
-        // Format debts for UI
         const debtList = Object.entries(balanceMap)
             .filter(([_, amt]) => Math.abs(amt) > 0.01)
             .map(([uid, amt]) => {
@@ -95,32 +146,28 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
             }).sort((a, b) => b.amount - a.amount);
 
         return { myTotalBalance: total, debts: debtList };
-    }, [expenses, currentUserId, members]);
+    }, [allExpenses, currentUserId, members]);
 
 
     // --- LOGIC: Section List by Month ---
     const sections = useMemo(() => {
         const grouped: Record<string, ExpenseWithDetails[]> = {};
-
-        expenses.forEach((exp) => {
+        allExpenses.forEach((exp) => {
             const date = new Date(exp.date);
             const key = `${date.toLocaleString('default', { month: 'long' })} ${date.getFullYear()}`;
             if (!grouped[key]) grouped[key] = [];
             grouped[key].push(exp);
         });
-
         return Object.entries(grouped).map(([title, data]) => ({
             title,
             data: data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         }));
-    }, [expenses]);
+    }, [allExpenses]);
 
 
     // --- RENDER HELPERS ---
-
     const renderHeader = () => (
         <View style={styles.headerContainer}>
-            {/* Balance Summary Card */}
             <View style={[styles.balanceCard, myTotalBalance >= 0 ? styles.bgGreen : styles.bgRed]}>
                 <Text style={styles.balanceLabel}>
                     {myTotalBalance >= 0 ? "You are owed" : "You owe"}
@@ -133,19 +180,16 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
                 )}
             </View>
 
-            {/* Who Owes Whom (Friends List snippet) */}
             {debts.length > 0 && (
                 <View style={styles.debtSection}>
-                    <Text style={styles.sectionTitle}>Balances</Text>
+                    <Text style={styles.sectionTitle}>Balances (From loaded Items)</Text>
                     {debts.map(debt => (
                         <View key={debt.userId} style={styles.debtRow}>
                             <View style={styles.avatarCircle}>
                                 <Text style={styles.avatarText}>{debt.name.charAt(0)}</Text>
                             </View>
                             <Text style={styles.debtText}>
-                                {debt.amount > 0
-                                    ? `${debt.name} owes you`
-                                    : `You owe ${debt.name}`}
+                                {debt.amount > 0 ? `${debt.name} owes you` : `You owe ${debt.name}`}
                             </Text>
                             <Text style={[styles.debtAmount, debt.amount > 0 ? styles.textGreen : styles.textRed]}>
                                 ${Math.abs(debt.amount).toFixed(2)}
@@ -159,8 +203,6 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
 
     const renderExpenseItem = ({ item }: { item: ExpenseWithDetails }) => {
         const isPayer = item.payer_id === currentUserId;
-        // Determine "my share" or status
-        // Simplified Logic: Status Label
         let statusLabel = "Not involved";
         let statusColor = Colors.textMuted;
         let amountDisplay = "";
@@ -170,7 +212,6 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
             statusColor = Colors.success;
             amountDisplay = `$${item.amount.toFixed(2)}`;
         } else {
-            // Find my split
             const mySplit = item.splits?.find((s: any) => s.user_id === currentUserId);
             if (mySplit) {
                 statusLabel = "You owe";
@@ -180,7 +221,10 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
         }
 
         return (
-            <TouchableOpacity style={styles.expenseItem}>
+            <TouchableOpacity
+                style={styles.expenseItem}
+                onPress={() => navigation.navigate('EditExpense', { expenseId: item.id, groupId: groupId })}
+            >
                 <View style={styles.dateBox}>
                     <Text style={styles.dateMonth}>{new Date(item.date).toLocaleString('default', { month: 'short' })}</Text>
                     <Text style={styles.dateDay}>{new Date(item.date).getDate()}</Text>
@@ -199,7 +243,7 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
         );
     };
 
-    if (isLoadingExpenses) {
+    if (isLoadingExpenses && page === 0) {
         return <View style={styles.centered}><ActivityIndicator size="large" color={Colors.primary} /></View>;
     }
 
@@ -215,6 +259,11 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
                 ListHeaderComponent={renderHeader}
                 contentContainerStyle={{ paddingBottom: 80 }}
                 stickySectionHeadersEnabled={false}
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.5}
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                ListFooterComponent={isFetching && page > 0 ? <ActivityIndicator style={{ margin: 20 }} /> : null}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No expenses yet.</Text>
@@ -223,7 +272,6 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
                 }
             />
 
-            {/* FAB */}
             <TouchableOpacity
                 style={styles.fab}
                 onPress={() => navigation.navigate('AddExpense', { groupId, groupName })}
@@ -235,174 +283,36 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    centered: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerContainer: {
-        padding: 20,
-    },
-    balanceCard: {
-        borderRadius: 12,
-        padding: 20,
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    bgGreen: { backgroundColor: Colors.success + '20' }, // 20% opacity
+    container: { flex: 1, backgroundColor: '#fff' },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    headerContainer: { padding: 20 },
+    balanceCard: { borderRadius: 12, padding: 20, alignItems: 'center', marginBottom: 24 },
+    bgGreen: { backgroundColor: Colors.success + '20' },
     bgRed: { backgroundColor: Colors.error + '20' },
-
-    balanceLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#555',
-        marginBottom: 4,
-        textTransform: 'uppercase',
-    },
-    balanceAmount: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    settleButton: {
-        marginTop: 12,
-        backgroundColor: Colors.success,
-        paddingHorizontal: 20,
-        paddingVertical: 8,
-        borderRadius: 20,
-    },
-    settleButtonText: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
-    debtSection: {
-        marginTop: 0,
-        marginBottom: 10,
-    },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 12,
-    },
-    debtRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    avatarCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#eee',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    avatarText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#555',
-    },
-    debtText: {
-        flex: 1,
-        fontSize: 15,
-        color: '#333',
-    },
-    debtAmount: {
-        fontSize: 15,
-        fontWeight: 'bold',
-    },
+    balanceLabel: { fontSize: 14, fontWeight: '600', color: '#555', marginBottom: 4, textTransform: 'uppercase' },
+    balanceAmount: { fontSize: 32, fontWeight: 'bold', color: '#333' },
+    settleButton: { marginTop: 12, backgroundColor: Colors.success, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 },
+    settleButtonText: { color: '#fff', fontWeight: 'bold' },
+    debtSection: { marginTop: 0, marginBottom: 10 },
+    sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 12 },
+    debtRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+    avatarCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+    avatarText: { fontSize: 14, fontWeight: 'bold', color: '#555' },
+    debtText: { flex: 1, fontSize: 15, color: '#333' },
+    debtAmount: { fontSize: 15, fontWeight: 'bold' },
     textGreen: { color: Colors.success },
     textRed: { color: Colors.error },
-
-    // List Styles
-    monthHeader: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#888',
-        backgroundColor: '#f9f9f9',
-        paddingHorizontal: 20,
-        paddingVertical: 8,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-    expenseItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-    },
-    dateBox: {
-        alignItems: 'center',
-        marginRight: 14,
-        width: 36,
-    },
-    dateMonth: {
-        fontSize: 10,
-        color: '#888',
-        textTransform: 'uppercase',
-    },
-    dateDay: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#444',
-    },
-    expenseIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 8,
-        backgroundColor: '#f2f2f2',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    expenseTitle: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#333',
-        marginBottom: 2,
-    },
-    expenseStatus: {
-        fontSize: 12,
-    },
-    expenseAmount: {
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    emptyContainer: {
-        padding: 40,
-        alignItems: 'center',
-    },
-    emptyText: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#ccc',
-    },
-    emptySubText: {
-        fontSize: 14,
-        color: '#ccc',
-        marginTop: 8,
-    },
-    fab: {
-        position: 'absolute',
-        bottom: 24,
-        right: 24,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: Colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-    },
+    monthHeader: { fontSize: 13, fontWeight: '600', color: '#888', backgroundColor: '#f9f9f9', paddingHorizontal: 20, paddingVertical: 8, textTransform: 'uppercase', letterSpacing: 1 },
+    expenseItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+    dateBox: { alignItems: 'center', marginRight: 14, width: 36 },
+    dateMonth: { fontSize: 10, color: '#888', textTransform: 'uppercase' },
+    dateDay: { fontSize: 18, fontWeight: 'bold', color: '#444' },
+    expenseIcon: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#f2f2f2', justifyContent: 'center', alignItems: 'center' },
+    expenseTitle: { fontSize: 16, fontWeight: '500', color: '#333', marginBottom: 2 },
+    expenseStatus: { fontSize: 12 },
+    expenseAmount: { fontSize: 16, fontWeight: 'bold' },
+    emptyContainer: { padding: 40, alignItems: 'center' },
+    emptyText: { fontSize: 18, fontWeight: '600', color: '#ccc' },
+    emptySubText: { fontSize: 14, color: '#ccc', marginTop: 8 },
+    fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 4 },
 });

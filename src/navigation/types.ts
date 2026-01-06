@@ -3,7 +3,7 @@ export type AppStackParamList = {
     MakeGroup: undefined;
     EditGroup: { groupId: string };
     GroupDetails: { groupId: string; groupName: string };
-    AddExpense: { groupId: string; groupName: string };
+    AddExpense: { groupId: string; groupName?: string; expenseId?: string };
     EditExpense: { expenseId: string; groupId: string };
     SettleUp: { userId?: string; groupId?: string } | undefined;
     ExpenseDetail: { expense: any };
@@ -18,7 +18,7 @@ export type AppStackParamList = {
         amount: number;
     };
     Filter: { currentFilters?: any };
-    CategorySelector: { onSelect: (category: string) => void };
+
     AddGroupMember: { groupId?: string };
     AddFriend: undefined;
 };

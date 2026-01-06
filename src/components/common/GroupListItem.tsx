@@ -156,4 +156,9 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#555',
     },
+    subtext: {
+        fontSize: 13,
+        color: '#888',
+        marginTop: 4,
+    },
 });

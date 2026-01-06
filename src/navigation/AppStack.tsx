@@ -72,14 +72,10 @@ export default function AppStack() {
                 component={require('../screens/home/FilterScreen').default}
                 options={{ headerShown: false, presentation: 'modal' }}
             />
-            <Stack.Screen
-                name="CategorySelector"
-                component={require('../screens/home/CategorySelectorScreen').default}
-                options={{ headerShown: false, presentation: 'modal' }}
-            />
+
             <Stack.Screen
                 name="EditExpense"
-                component={require('../screens/home/EditExpenseScreen').default}
+                component={AddExpenseScreen}
                 options={{ headerShown: false, presentation: 'modal' }}
             />
             <Stack.Screen

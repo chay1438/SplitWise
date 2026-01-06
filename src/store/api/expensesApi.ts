@@ -7,7 +7,7 @@ import { expenseService } from '../../services/expenseService';
 export const expensesApiSlice = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
 
-        getExpenses: builder.query<ExpenseWithDetails[], { groupId?: string; userId?: string }>({
+        getExpenses: builder.query<ExpenseWithDetails[], { groupId?: string; userId?: string; page?: number; limit?: number }>({
             queryFn: async (filters) => {
                 try {
                     const data = await expenseService.getExpenses(filters);

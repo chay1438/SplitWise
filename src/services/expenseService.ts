@@ -2,7 +2,12 @@ import { supabase } from '../lib/supabase';
 import { Expense, ExpenseWithDetails } from '../types';
 
 export const expenseService = {
-    async getExpenses(filters: { groupId?: string; userId?: string }): Promise<ExpenseWithDetails[]> {
+    async getExpenses(filters: { groupId?: string; userId?: string; page?: number; limit?: number }): Promise<ExpenseWithDetails[]> {
+        const page = filters.page || 0;
+        const limit = filters.limit || 20;
+        const from = page * limit;
+        const to = from + limit - 1;
+
         let query = supabase
             .from('expenses')
             .select(`
@@ -16,6 +21,9 @@ export const expenseService = {
             .order('date', { ascending: false });
 
         if (filters.groupId) query = query.eq('group_id', filters.groupId);
+
+        // Apply Range if pagination is requested (implicit or explicit)
+        query = query.range(from, to);
 
         const { data, error } = await query;
         if (error) throw error;
@@ -71,8 +79,20 @@ export const expenseService = {
     },
 
     async deleteExpense(expenseId: string): Promise<void> {
-        // Splits should cascade delete if configured in DB, else delete them first.
-        const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
+        // 1. Delete splits first (safer if CASCADE not set)
+        const { error: splitError } = await supabase
+            .from('expense_splits')
+            .delete()
+            .eq('expense_id', expenseId);
+
+        if (splitError) throw splitError;
+
+        // 2. Delete the expense
+        const { error } = await supabase
+            .from('expenses')
+            .delete()
+            .eq('id', expenseId);
+
         if (error) throw error;
     },
 

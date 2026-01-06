@@ -19,7 +19,7 @@ export const groupsApiSlice = apiSlice.injectEndpoints({
             providesTags: ['Groups']
         }),
 
-        createGroup: builder.mutation<Group, { name: string; type: string; createdBy: string; memberIds?: string[] }>({
+        createGroup: builder.mutation<Group, { name: string; type: string; createdBy: string; memberIds?: string[]; avatar_url?: string }>({
             queryFn: async (input) => {
                 try {
                     const data = await groupService.createGroup(input);
@@ -31,22 +31,23 @@ export const groupsApiSlice = apiSlice.injectEndpoints({
             invalidatesTags: ['Groups']
         }),
 
-        addMember: builder.mutation<void, { groupId: string; userId: string }>({
+        addMember: builder.mutation<null, { groupId: string; userId: string }>({
             queryFn: async ({ groupId, userId }) => {
                 try {
                     await groupService.addMember(groupId, userId);
-                    return { data: undefined };
+                    return { data: null };
                 } catch (error: any) {
                     return { error: error.message };
                 }
             },
         }),
 
-        updateGroup: builder.mutation<void, { groupId: string; name?: string; type?: string }>({
+        updateGroup: builder.mutation<null, { groupId: string; name?: string; type?: string; avatar_url?: string | null }>({
             queryFn: async ({ groupId, ...updates }) => {
                 try {
+                    // @ts-ignore - updates might contain nulls which service might not strict-check, but we want to pass them
                     await groupService.updateGroup(groupId, updates);
-                    return { data: undefined };
+                    return { data: null };
                 } catch (error: any) {
                     return { error: error.message };
                 }

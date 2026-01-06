@@ -18,7 +18,7 @@ import { supabase } from '../../lib/supabase';
 
 // Image Upload
 import * as ImagePicker from 'expo-image-picker';
-import { uploadImageToSupabase } from '../../services/imageUploadService';
+import { uploadImageToSupabase, deleteImageFromSupabase } from '../../services/imageUploadService';
 
 export default function MakeGroupScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
@@ -48,6 +48,7 @@ export default function MakeGroupScreen() {
 
     // Image State
     const [groupImage, setGroupImage] = useState<string | null>(null);
+    const [imageDeleted, setImageDeleted] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
 
     // Pre-fill
@@ -55,9 +56,9 @@ export default function MakeGroupScreen() {
         if (isEditMode && group) {
             setName(group.name);
             setType(group.type);
-            // Assuming group object might have image_url/avatar_url globally in future, 
-            // but currently types don't support it strictly. 
-            // If it did: setGroupImage(group.avatar_url);
+            if (group.avatar_url) {
+                setGroupImage(group.avatar_url);
+            }
             if (group.members) {
                 setSelectedFriends(new Set(group.members.map(m => m.id)));
             }
@@ -93,7 +94,16 @@ export default function MakeGroupScreen() {
 
         if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets.length > 0) {
             setGroupImage(pickerResult.assets[0].uri);
+            setImageDeleted(false); // Reset delete flag if new image picked
         }
+    };
+
+    const handleRemoveImage = () => {
+        // If we are removing an image that was already on server (http), mark for deletion
+        if (groupImage && groupImage.startsWith('http')) {
+            setImageDeleted(true);
+        }
+        setGroupImage(null);
     };
 
     const handleSubmit = async () => {
@@ -110,9 +120,17 @@ export default function MakeGroupScreen() {
         try {
             setUploadingImage(true);
 
-            // Upload Image if present
+            // 1. Handle Deletion (if applicable)
+            if (imageDeleted && groupId && group?.avatar_url) {
+                // Background delete from storage (optional, but good for cleanup)
+                deleteImageFromSupabase(group.avatar_url, 'avatars');
+            }
+
+            // 2. Handle Upload
             let finalImageUrl = undefined;
-            if (groupImage && !groupImage.startsWith('http')) {
+            if (imageDeleted) {
+                finalImageUrl = null; // Explicitly set to null to remove from DB
+            } else if (groupImage && !groupImage.startsWith('http')) {
                 finalImageUrl = await uploadImageToSupabase(groupImage, 'avatars');
             } else if (groupImage) {
                 finalImageUrl = groupImage; // Existing URL
@@ -203,7 +221,7 @@ export default function MakeGroupScreen() {
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>New Group</Text>
+                <Text style={styles.headerTitle}>{isEditMode ? 'Edit Group' : 'New Group'}</Text>
                 <TouchableOpacity onPress={handleSubmit} disabled={isCreating || isUpdating || uploadingImage}>
                     {isCreating || isUpdating || uploadingImage ? <ActivityIndicator color={Colors.primary} /> : <Text style={styles.saveText}>Save</Text>}
                 </TouchableOpacity>
@@ -214,13 +232,28 @@ export default function MakeGroupScreen() {
                 {/* Group Details */}
                 <View style={styles.section}>
                     <View style={styles.inputRow}>
-                        <TouchableOpacity style={styles.photoButton} onPress={handlePickImage} disabled={uploadingImage}>
-                            {groupImage ? (
-                                <Image source={{ uri: groupImage }} style={{ width: '100%', height: '100%', borderRadius: 8 }} />
-                            ) : (
-                                <Ionicons name="camera-outline" size={24} color="#666" />
+                        <View>
+                            <TouchableOpacity style={styles.photoButton} onPress={handlePickImage} disabled={uploadingImage}>
+                                {groupImage ? (
+                                    <>
+                                        <Image source={{ uri: groupImage }} style={{ width: '100%', height: '100%', borderRadius: 8 }} />
+                                        <View style={styles.editBadge}>
+                                            <Ionicons name="pencil" size={12} color="#fff" />
+                                        </View>
+                                    </>
+                                ) : (
+                                    <View style={{ alignItems: 'center' }}>
+                                        <Ionicons name="camera-outline" size={24} color="#666" />
+                                        <Text style={{ fontSize: 10, color: '#666', marginTop: 4 }}>Add</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                            {groupImage && (
+                                <TouchableOpacity style={styles.removeBadge} onPress={handleRemoveImage}>
+                                    <Ionicons name="close" size={12} color="#fff" />
+                                </TouchableOpacity>
                             )}
-                        </TouchableOpacity>
+                        </View>
                         <TextInput
                             style={styles.nameInput}
                             placeholder="Group Name"
@@ -246,8 +279,28 @@ export default function MakeGroupScreen() {
                     ))}
                 </View>
 
-                {/* Add Members */}
-                <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Add Members</Text>
+                {/* Actions (Add Expense) */}
+                <TouchableOpacity
+                    style={[styles.actionButton, !groupId && { backgroundColor: '#ccc' }]}
+                    onPress={() => {
+                        if (!groupId) {
+                            Alert.alert("Notice", "Please save the group first before adding expenses.");
+                            return;
+                        }
+                        navigation.navigate('AddExpense', { groupId: groupId, groupName: name });
+                    }}
+                >
+                    <Ionicons name="receipt-outline" size={20} color="#fff" />
+                    <Text style={styles.actionButtonText}>Add Group Expense</Text>
+                </TouchableOpacity>
+
+                {/* Add Members Header */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, marginBottom: 12 }}>
+                    <Text style={[styles.sectionLabel, { marginBottom: 0 }]}>Add Members</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('AddFriend')}>
+                        <Text style={{ color: Colors.primary, fontWeight: '600' }}>+ Add New Friend</Text>
+                    </TouchableOpacity>
+                </View>
                 <View style={styles.friendsListContainer}>
                     {friends.length === 0 ? (
                         <Text style={styles.emptyFriends}>No friends found. Add friends first!</Text>
@@ -296,5 +349,46 @@ const styles = StyleSheet.create({
     friendAvatarText: { fontWeight: 'bold', color: '#555' },
     friendName: { fontSize: 16, color: '#333' },
     friendNameSelected: { fontWeight: '600' },
-    emptyFriends: { color: '#999', fontStyle: 'italic' }
+    emptyFriends: { color: '#999', fontStyle: 'italic' },
+    editBadge: {
+        position: 'absolute',
+        bottom: -4,
+        right: -4,
+        backgroundColor: Colors.primary,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    removeBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: '#ff4444',
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#fff',
+        zIndex: 10
+    },
+    actionButton: {
+        backgroundColor: Colors.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 16
+    },
+    actionButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        marginLeft: 8
+    }
 });
