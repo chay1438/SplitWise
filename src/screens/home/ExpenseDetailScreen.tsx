@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { Colors } from '../../constants';
@@ -56,7 +57,7 @@ export default function ExpenseDetailScreen({ route, navigation }: Props) {
     };
 
     return (
-        <View style={styles.container}>
+        <ScreenWrapper style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -154,7 +155,7 @@ export default function ExpenseDetailScreen({ route, navigation }: Props) {
                 </View>
 
             </ScrollView>
-        </View>
+        </ScreenWrapper>
     );
 }
 
@@ -168,7 +169,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 60,
         paddingBottom: 20,
         backgroundColor: '#fff',
         borderBottomWidth: 1,

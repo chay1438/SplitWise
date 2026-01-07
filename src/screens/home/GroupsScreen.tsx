@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
@@ -61,7 +62,7 @@ export default function GroupsScreen() {
     );
 
     return (
-        <View style={styles.container}>
+        <ScreenWrapper style={styles.container}>
             <View style={styles.header}>
                 <View>
                     <Text style={styles.title}>My Groups</Text>
@@ -93,7 +94,7 @@ export default function GroupsScreen() {
                     contentContainerStyle={{ paddingBottom: 60 }}
                 />
             )}
-        </View>
+        </ScreenWrapper>
     );
 }
 

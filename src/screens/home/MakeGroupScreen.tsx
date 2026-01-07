@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, FlatList, Switch, Alert, ScrollView } from 'react-native';
+import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
@@ -215,7 +216,7 @@ export default function MakeGroupScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <ScreenWrapper style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -316,12 +317,12 @@ export default function MakeGroupScreen() {
                 </View>
 
             </ScrollView>
-        </View>
+        </ScreenWrapper>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff', paddingTop: 10 },
+    container: { flex: 1, backgroundColor: '#fff' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
     cancelText: { fontSize: 16, color: '#666' },
     saveText: { fontSize: 16, fontWeight: 'bold', color: Colors.primary },

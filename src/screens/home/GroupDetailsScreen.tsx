@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, SectionList, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, Alert, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { Profile, ExpenseWithDetails, GroupWithMembers } from '../../types';
@@ -58,7 +58,7 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
                     const existingIds = new Set(prev.map(e => e.id));
                     const uniqueNew = expensesPage.filter(e => !existingIds.has(e.id));
                     return [...prev, ...uniqueNew];
-                });
+                })
             }
         }
     }, [expensesHash, page]);
@@ -253,7 +253,7 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['bottom']}>
+        <ScreenWrapper style={styles.container} edges={['bottom']}>
             <SectionList
                 sections={sections}
                 keyExtractor={(item) => item.id}
@@ -283,7 +283,7 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
             >
                 <Ionicons name="add" size={30} color="#fff" />
             </TouchableOpacity>
-        </SafeAreaView>
+        </ScreenWrapper>
     );
 }
 

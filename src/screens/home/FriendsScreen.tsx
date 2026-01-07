@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useGetFriendsQuery, useSearchUsersMutation, useSendFriendRequestMutation } from '../../store/api/friendsApi';
 import { useGetExpensesQuery } from '../../store/api/expensesApi';
@@ -108,7 +108,7 @@ export default function FriendsScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <ScreenWrapper style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Friends</Text>
@@ -137,7 +137,7 @@ export default function FriendsScreen() {
                     }
                 />
             )}
-        </SafeAreaView>
+        </ScreenWrapper>
     );
 }
 

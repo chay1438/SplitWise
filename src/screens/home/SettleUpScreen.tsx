@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, Alert, ActivityIndicator, Image, Modal, ScrollView } from 'react-native';
+import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { useGetBalancesQuery } from '../../store/api/balanceApi';
@@ -234,16 +235,16 @@ export default function SettleUpScreen({ navigation, route }: Props) {
     );
 
     return (
-        <View style={styles.container}>
+        <ScreenWrapper style={styles.container} edges={['top']}>
             {step === 'select' && renderSelectStep()}
             {step === 'confirm' && renderConfirmStep()}
             {step === 'success' && renderSuccessStep()}
-        </View>
+        </ScreenWrapper>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff', paddingTop: 20 },
+    container: { flex: 1, backgroundColor: '#fff' },
     stepContainer: { flex: 1 },
     header: { fontSize: 24, fontWeight: 'bold', margin: 20, color: '#333' },
     confirmHeader: {

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { Colors } from '../../constants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../hooks/useAuth';
@@ -76,7 +76,7 @@ export default function ActivityScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <ScreenWrapper style={styles.container} edges={['top']}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Activity</Text>
                 {/* Filter Placeholder */}
@@ -100,7 +100,7 @@ export default function ActivityScreen() {
                     }
                 />
             )}
-        </SafeAreaView>
+        </ScreenWrapper>
     );
 }
 

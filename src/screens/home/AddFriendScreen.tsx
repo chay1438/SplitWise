@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert, Share, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSearchUsersMutation, useSendFriendRequestMutation } from '../../store/api/friendsApi';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
@@ -134,7 +134,7 @@ export default function AddFriendScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
+        <ScreenWrapper style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -283,7 +283,7 @@ export default function AddFriendScreen() {
                     </>
                 )}
             </View>
-        </SafeAreaView>
+        </ScreenWrapper>
     );
 }
 

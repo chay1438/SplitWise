@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Modal, FlatList, Image } from 'react-native';
+import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { SplitType } from '../../types';
@@ -488,132 +489,134 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
     const isWorking = isCreating || isUpdating || uploadingImage;
 
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.cancelButton}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{isEditing ? 'Edit Expense' : 'Add Expense'}</Text>
-                <TouchableOpacity onPress={handleSave} disabled={isWorking}>
-                    {isWorking ? <ActivityIndicator color={Colors.primary} /> : <Text style={styles.saveButton}>Save</Text>}
-                </TouchableOpacity>
-            </View>
+        <ScreenWrapper style={{ flex: 1 }} edges={['top']}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+                {/* Header */}
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()}>
+                        <Text style={styles.cancelButton}>Cancel</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>{isEditing ? 'Edit Expense' : 'Add Expense'}</Text>
+                    <TouchableOpacity onPress={handleSave} disabled={isWorking}>
+                        {isWorking ? <ActivityIndicator color={Colors.primary} /> : <Text style={styles.saveButton}>Save</Text>}
+                    </TouchableOpacity>
+                </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+                <ScrollView contentContainerStyle={styles.content}>
 
-                {/* Group Selector */}
-                <TouchableOpacity
-                    style={styles.groupSelector}
-                    onPress={() => !isEditing && setShowGroupModal(true)}
-                    disabled={isEditing}
-                >
-                    {selectedGroup?.avatar_url ? (
-                        <Image source={{ uri: selectedGroup.avatar_url }} style={styles.groupSelectorImage} />
-                    ) : (
-                        <View style={styles.iconBox}>
-                            <Ionicons name="people-outline" size={24} color={Colors.primary} />
+                    {/* Group Selector */}
+                    <TouchableOpacity
+                        style={styles.groupSelector}
+                        onPress={() => !isEditing && setShowGroupModal(true)}
+                        disabled={isEditing}
+                    >
+                        {selectedGroup?.avatar_url ? (
+                            <Image source={{ uri: selectedGroup.avatar_url }} style={styles.groupSelectorImage} />
+                        ) : (
+                            <View style={styles.iconBox}>
+                                <Ionicons name="people-outline" size={24} color={Colors.primary} />
+                            </View>
+                        )}
+
+                        <Text style={styles.groupSelectorText}>
+                            {selectedGroup ? selectedGroup.name : "Select a Group"}
+                        </Text>
+                        {!isEditing && <Ionicons name="chevron-forward" size={20} color="#ccc" />}
+                    </TouchableOpacity>
+
+                    {/* Inputs */}
+                    <View style={styles.inputRow}>
+                        <View style={styles.iconBox}><Ionicons name="reader-outline" size={24} color="#666" /></View>
+                        <TextInput
+                            style={styles.descInput}
+                            placeholder="Enter description"
+                            value={description}
+                            onChangeText={setDescription}
+                            autoFocus={!isEditing}
+                        />
+                    </View>
+
+                    <View style={styles.inputRow}>
+                        <View style={styles.iconBox}><Ionicons name="logo-usd" size={24} color="#666" /></View>
+                        <TextInput
+                            style={styles.amountInput}
+                            placeholder="0.00"
+                            keyboardType="numeric"
+                            value={amount}
+                            onChangeText={setAmount}
+                        />
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    {/* Paid By & Split Logic */}
+                    {selectedGroupId ? (
+                        <View style={styles.splitSummary}>
+                            <Text style={styles.summaryText}>Paid by</Text>
+                            <TouchableOpacity onPress={() => setShowPayerModal(true)} style={styles.pill}>
+                                <Text style={styles.pillText}>{payerName}</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.summaryText}>and split</Text>
+                            <TouchableOpacity onPress={() => setShowSplitModal(true)} style={styles.pill}>
+                                <Text style={styles.pillText}>
+                                    {splitType === 'EQUAL' ? 'equally' : splitType === 'PERCENTAGE' ? 'by %' : 'unequally'}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
-                    )}
-
-                    <Text style={styles.groupSelectorText}>
-                        {selectedGroup ? selectedGroup.name : "Select a Group"}
-                    </Text>
-                    {!isEditing && <Ionicons name="chevron-forward" size={20} color="#ccc" />}
-                </TouchableOpacity>
-
-                {/* Inputs */}
-                <View style={styles.inputRow}>
-                    <View style={styles.iconBox}><Ionicons name="reader-outline" size={24} color="#666" /></View>
-                    <TextInput
-                        style={styles.descInput}
-                        placeholder="Enter description"
-                        value={description}
-                        onChangeText={setDescription}
-                        autoFocus={!isEditing}
-                    />
-                </View>
-
-                <View style={styles.inputRow}>
-                    <View style={styles.iconBox}><Ionicons name="logo-usd" size={24} color="#666" /></View>
-                    <TextInput
-                        style={styles.amountInput}
-                        placeholder="0.00"
-                        keyboardType="numeric"
-                        value={amount}
-                        onChangeText={setAmount}
-                    />
-                </View>
-
-                <View style={styles.divider} />
-
-                {/* Paid By & Split Logic */}
-                {selectedGroupId ? (
-                    <View style={styles.splitSummary}>
-                        <Text style={styles.summaryText}>Paid by</Text>
-                        <TouchableOpacity onPress={() => setShowPayerModal(true)} style={styles.pill}>
-                            <Text style={styles.pillText}>{payerName}</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.summaryText}>and split</Text>
-                        <TouchableOpacity onPress={() => setShowSplitModal(true)} style={styles.pill}>
-                            <Text style={styles.pillText}>
-                                {splitType === 'EQUAL' ? 'equally' : splitType === 'PERCENTAGE' ? 'by %' : 'unequally'}
+                    ) : (
+                        <TouchableOpacity onPress={() => Alert.alert('Attention', 'Please select a group first')} style={{ padding: 10 }}>
+                            <Text style={{ textAlign: 'center', color: Colors.primary, fontStyle: 'italic', textDecorationLine: 'underline' }}>
+                                Select a group to split expenses
                             </Text>
                         </TouchableOpacity>
+                    )}
+
+                    {/* Date Display (Read only for now) */}
+                    <View style={styles.dateRow}>
+                        <Ionicons name="calendar-outline" size={20} color="#888" />
+                        <Text style={styles.dateText}>{date.toLocaleDateString()}</Text>
                     </View>
-                ) : (
-                    <TouchableOpacity onPress={() => Alert.alert('Attention', 'Please select a group first')} style={{ padding: 10 }}>
-                        <Text style={{ textAlign: 'center', color: Colors.primary, fontStyle: 'italic', textDecorationLine: 'underline' }}>
-                            Select a group to split expenses
-                        </Text>
-                    </TouchableOpacity>
-                )}
 
-                {/* Date Display (Read only for now) */}
-                <View style={styles.dateRow}>
-                    <Ionicons name="calendar-outline" size={20} color="#888" />
-                    <Text style={styles.dateText}>{date.toLocaleDateString()}</Text>
-                </View>
+                    {/* Receipt Image Handler */}
+                    <View style={{ marginTop: 20 }}>
+                        <TouchableOpacity style={styles.actionButton} onPress={handlePickImage}>
+                            <Ionicons name={receiptImage ? "sync" : "camera-outline"} size={20} color={receiptImage ? Colors.primary : "#888"} />
+                            <Text style={[styles.actionText, receiptImage && { color: Colors.primary, fontWeight: 'bold' }]}>
+                                {receiptImage ? "Change Receipt" : "Add receipt"}
+                            </Text>
+                        </TouchableOpacity>
 
-                {/* Receipt Image Handler */}
-                <View style={{ marginTop: 20 }}>
-                    <TouchableOpacity style={styles.actionButton} onPress={handlePickImage}>
-                        <Ionicons name={receiptImage ? "sync" : "camera-outline"} size={20} color={receiptImage ? Colors.primary : "#888"} />
-                        <Text style={[styles.actionText, receiptImage && { color: Colors.primary, fontWeight: 'bold' }]}>
-                            {receiptImage ? "Change Receipt" : "Add receipt"}
-                        </Text>
-                    </TouchableOpacity>
+                        {receiptImage && (
+                            <View style={styles.previewContainer}>
+                                <Image source={{ uri: receiptImage }} style={styles.receiptPreview} />
+                                <TouchableOpacity onPress={handleRemoveImage} style={styles.removeReceiptBtn}>
+                                    <Ionicons name="close-circle" size={24} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
 
-                    {receiptImage && (
-                        <View style={styles.previewContainer}>
-                            <Image source={{ uri: receiptImage }} style={styles.receiptPreview} />
-                            <TouchableOpacity onPress={handleRemoveImage} style={styles.removeReceiptBtn}>
-                                <Ionicons name="close-circle" size={24} color="#fff" />
+                    {/* Delete Button (Only in Edit Mode) */}
+                    {isEditing && (
+                        <View style={{ marginTop: 40, borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 20 }}>
+                            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+                                <Text style={styles.deleteText}>Delete Expense</Text>
                             </TouchableOpacity>
                         </View>
                     )}
-                </View>
+                </ScrollView>
 
-                {/* Delete Button (Only in Edit Mode) */}
-                {isEditing && (
-                    <View style={{ marginTop: 40, borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 20 }}>
-                        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-                            <Text style={styles.deleteText}>Delete Expense</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-            </ScrollView>
-
-            {renderPayerModal()}
-            {renderSplitModal()}
-            {renderGroupModal()}
-        </KeyboardAvoidingView>
+                {renderPayerModal()}
+                {renderSplitModal()}
+                {renderGroupModal()}
+            </KeyboardAvoidingView>
+        </ScreenWrapper>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 60, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: '#fff' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: '#fff' },
     headerTitle: { fontSize: 17, fontWeight: '600' },
     cancelButton: { fontSize: 17, color: '#666' },
     saveButton: { fontSize: 17, fontWeight: 'bold', color: Colors.primary },

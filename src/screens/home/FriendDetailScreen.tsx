@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal } from 'react-native';
+import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { Colors } from '../../constants';
@@ -113,7 +114,7 @@ export default function FriendDetailScreen({ route, navigation }: Props) {
     };
 
     return (
-        <View style={styles.container}>
+        <ScreenWrapper style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -194,7 +195,7 @@ export default function FriendDetailScreen({ route, navigation }: Props) {
                     contentContainerStyle={{ paddingBottom: 20 }}
                 />
             )}
-        </View>
+        </ScreenWrapper>
     );
 }
 
@@ -205,10 +206,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingTop: 60,
-        paddingBottom: 16,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
         borderBottomColor: '#eee',
     },
     headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
