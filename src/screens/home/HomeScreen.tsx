@@ -171,7 +171,6 @@ export default function HomeScreen() {
                             title={item.name}
                             amount={item.balance}
                             color={item.color}
-                            members={item.members}
                             imageUrl={item.avatar_url}
                             onPress={() => navigation.navigate('GroupDetails', { groupId: item.id, groupName: item.name })}
                         />

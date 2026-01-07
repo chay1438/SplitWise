@@ -5,7 +5,7 @@ export type AppStackParamList = {
     GroupDetails: { groupId: string; groupName: string };
     AddExpense: { groupId: string; groupName?: string; expenseId?: string };
     EditExpense: { expenseId: string; groupId: string };
-    SettleUp: { userId?: string; groupId?: string } | undefined;
+    GroupSettleUp: { groupId: string };
     ExpenseDetail: { expense: any };
     FriendDetail: { friendId: string };
     Notifications: undefined;

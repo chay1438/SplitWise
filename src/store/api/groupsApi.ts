@@ -53,9 +53,57 @@ export const groupsApiSlice = apiSlice.injectEndpoints({
                 }
             },
             invalidatesTags: ['Groups']
+        }),
+
+        leaveGroup: builder.mutation<null, { groupId: string; userId: string }>({
+            queryFn: async ({ groupId, userId }) => {
+                try {
+                    await groupService.leaveGroup(groupId, userId);
+                    return { data: null };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            },
+            invalidatesTags: ['Groups']
+        }),
+
+        deleteGroup: builder.mutation<null, string>({
+            queryFn: async (groupId) => {
+                try {
+                    await groupService.deleteGroup(groupId);
+                    return { data: null };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            },
+            invalidatesTags: ['Groups']
+        }),
+
+        updateMemberRole: builder.mutation<null, { groupId: string; userId: string; role: 'admin' | 'member' }>({
+            queryFn: async ({ groupId, userId, role }) => {
+                try {
+                    await groupService.updateMemberRole(groupId, userId, role);
+                    return { data: null };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            },
+            invalidatesTags: ['Groups']
+        }),
+
+        removeMember: builder.mutation<null, { groupId: string; userId: string }>({
+            queryFn: async ({ groupId, userId }) => {
+                try {
+                    await groupService.removeMember(groupId, userId);
+                    return { data: null };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            },
+            invalidatesTags: ['Groups']
         })
 
     }),
 });
 
-export const { useGetGroupsQuery, useCreateGroupMutation, useAddMemberMutation, useUpdateGroupMutation } = groupsApiSlice;
+export const { useGetGroupsQuery, useCreateGroupMutation, useAddMemberMutation, useUpdateGroupMutation, useLeaveGroupMutation, useDeleteGroupMutation, useUpdateMemberRoleMutation, useRemoveMemberMutation } = groupsApiSlice;

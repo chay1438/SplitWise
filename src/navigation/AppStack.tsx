@@ -4,7 +4,7 @@ import BottomTabs from './BottomTabs';
 import MakeGroupScreen from '../screens/home/MakeGroupScreen';
 import GroupDetailsScreen from '../screens/home/GroupDetailsScreen';
 import AddExpenseScreen from '../screens/home/AddExpenseScreen';
-import SettleUpScreen from '../screens/home/SettleUpScreen';
+import GroupSettleUpScreen from '../screens/home/GroupSettleUpScreen';
 import { AppStackParamList } from './types';
 import AddGroupMemberScreen from '../screens/groups/AddGroupMemberScreen';
 
@@ -38,8 +38,8 @@ export default function AppStack() {
                 options={{ title: 'Add Expense', headerShown: true }}
             />
             <Stack.Screen
-                name="SettleUp"
-                component={SettleUpScreen}
+                name="GroupSettleUp"
+                component={GroupSettleUpScreen}
                 options={{ title: 'Settle Up', headerShown: true }}
             />
             <Stack.Screen

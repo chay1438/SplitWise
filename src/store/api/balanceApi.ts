@@ -29,9 +29,21 @@ export const balanceApiSlice = apiSlice.injectEndpoints({
                 }
             },
             providesTags: ['Balances']
+        }),
+
+        getGroupActionableBalances: builder.query<any[], { groupId: string; currentUserId: string }>({
+            queryFn: async ({ groupId, currentUserId }) => {
+                try {
+                    const data = await balanceService.getGroupActionableBalances(groupId, currentUserId);
+                    return { data };
+                } catch (e: any) {
+                    return { error: e.message };
+                }
+            },
+            providesTags: ['Balances', 'Expenses']
         })
 
     }),
 });
 
-export const { useGetUserBalanceSummaryQuery, useGetBalancesQuery } = balanceApiSlice;
+export const { useGetUserBalanceSummaryQuery, useGetBalancesQuery, useGetGroupActionableBalancesQuery } = balanceApiSlice;

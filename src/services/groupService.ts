@@ -29,7 +29,10 @@ export const groupService = {
 
         return data.map((g: any) => ({
             ...g,
-            members: g.members.map((m: any) => m.profile).filter(Boolean)
+            members: g.members.map((m: any) => ({
+                ...m.profile,
+                role: m.role || 'member'
+            })).filter((m: any) => m.id) // Ensure profile exists
         })) as GroupWithMembers[];
     },
 
@@ -72,6 +75,45 @@ export const groupService = {
             .from('groups')
             .update(data)
             .eq('id', groupId);
+        if (error) throw error;
+    },
+
+    async leaveGroup(groupId: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('group_members')
+            .delete()
+            .eq('group_id', groupId)
+            .eq('user_id', userId);
+
+        if (error) throw error;
+    },
+
+    async deleteGroup(groupId: string): Promise<void> {
+        const { error } = await supabase
+            .from('groups')
+            .delete()
+            .eq('id', groupId);
+
+        if (error) throw error;
+    },
+
+    async updateMemberRole(groupId: string, userId: string, role: 'admin' | 'member'): Promise<void> {
+        const { error } = await supabase
+            .from('group_members')
+            .update({ role })
+            .eq('group_id', groupId)
+            .eq('user_id', userId);
+
+        if (error) throw error;
+    },
+
+    async removeMember(groupId: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('group_members')
+            .delete()
+            .eq('group_id', groupId)
+            .eq('user_id', userId);
+
         if (error) throw error;
     }
 };

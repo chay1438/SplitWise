@@ -1,291 +1,333 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, Alert, ActivityIndicator, Image, Modal, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
-import { useGetBalancesQuery } from '../../store/api/balanceApi';
-import { useCreateSettlementMutation } from '../../store/api/settlementsApi';
-import { supabase } from '../../lib/supabase';
-import { Profile } from '../../types';
+import { useGetGroupActionableBalancesQuery } from '../../store/api/balanceApi';
+import { useGetSettlementsQuery, useCreateSettlementMutation } from '../../store/api/settlementsApi';
+import { useGetGroupsQuery } from '../../store/api/groupsApi';
 import { useAuth } from '../../hooks/useAuth';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../constants';
 
-type OweItem = {
-    userId: string;
-    amount: number;
-    profile?: Profile;
-    groupId?: string;
-};
+type Props = NativeStackScreenProps<AppStackParamList, 'SettleUp'>;
 
 type PaymentMethod = 'Cash' | 'UPI' | 'PayPal' | 'Other';
 
-type Props = NativeStackScreenProps<AppStackParamList, 'SettleUp'>;
-
 export default function SettleUpScreen({ navigation, route }: Props) {
+    const groupId = route.params?.groupId;
     const { user } = useAuth();
     const currentUserId = user?.id;
 
-    const { data: rawBalances, isLoading: isLoadingBalances } = useGetBalancesQuery(currentUserId || '', { skip: !currentUserId });
+    if (!groupId || !currentUserId) {
+        // Fallback or Error Case
+        navigation.goBack();
+        return null;
+    }
+
+    // --- 1. DATA FETCHING ---
+    // A. Actionable Balances (Who owes whom in this group)
+    const { data: groupBalances = [], isLoading: loadingBalances } = useGetGroupActionableBalancesQuery({
+        groupId,
+        currentUserId
+    });
+
+    // B. Settlements History
+    const { data: history = [], isLoading: loadingHistory } = useGetSettlementsQuery({ groupId });
+
+    // C. Group Info (for name fallback)
+    const { data: groups = [] } = useGetGroupsQuery(currentUserId || '');
+    const groupName = groups.find(g => g.id === groupId)?.name || "Group";
+
+    // Mutation
     const [createSettlement, { isLoading: isSaving }] = useCreateSettlementMutation();
 
-    // Steps: 'select' (list debts) -> 'confirm' (amount/method) -> 'success'
-    const [step, setStep] = useState<'select' | 'confirm' | 'success'>('select');
+    // --- 2. STATE ---
+    const [modalVisible, setModalVisible] = useState(false);
+    const [selectedPeer, setSelectedPeer] = useState<{ userId: string; name: string; amount: number; isOwe: boolean } | null>(null);
 
-    // State
-    const [debts, setDebts] = useState<OweItem[]>([]);
-    const [selectedUser, setSelectedUser] = useState<OweItem | null>(null);
+    // Form State
     const [amount, setAmount] = useState('');
-    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
-    const [profileLoading, setProfileLoading] = useState(false);
+    const [note, setNote] = useState('');
+    const [method, setMethod] = useState<PaymentMethod>('Cash');
 
-    // Initial Load
-    useEffect(() => {
-        if (rawBalances) {
-            processDebts(rawBalances);
-        }
-    }, [rawBalances]);
 
-    // Params Handling (If coming from FriendDetail)
-    /* 
-       Note: If userId is passed in params, we might skip selection.
-       However, we need 'groupId' to record debt accurately if it's group-based.
-       For now, we'll stick to selection unless we implement direct-friend lookup logic.
-    */
+    // --- 3. HANDLERS ---
 
-    const processDebts = async (balances: any[]) => {
-        if (!currentUserId) return;
-        setProfileLoading(true);
-        try {
-            const myDebts: OweItem[] = [];
-            // Filter balances where net_balance < 0 (I owe)
-            const oweBalances = balances.filter(b => parseFloat(b.net_balance) < 0);
-
-            for (const b of oweBalances) {
-                const oweAmount = Math.abs(parseFloat(b.net_balance));
-                // Fetch potential payees in this group
-                const { data: potentialPayees } = await supabase
-                    .from('group_balances_view')
-                    .select('*')
-                    .eq('group_id', b.group_id)
-                    .gt('net_balance', 0);
-
-                if (potentialPayees && potentialPayees.length > 0) {
-                    for (const payee of potentialPayees) {
-                        // Simplify: Proportional suggestion or just list valid payees.
-                        const { data: profile } = await supabase
-                            .from('profiles')
-                            .select('*')
-                            .eq('id', payee.user_id)
-                            .single();
-
-                        if (profile) {
-                            myDebts.push({
-                                userId: payee.user_id,
-                                amount: oweAmount, // Showing total debt context
-                                groupId: b.group_id,
-                                profile
-                            });
-                        }
-                    }
-                }
-            }
-            // Dedup by userId
-            const uniqueDebts = Array.from(new Map(myDebts.map(item => [item.userId, item])).values());
-            setDebts(uniqueDebts);
-
-            // Auto-select if param passed
-            if (route.params?.userId) {
-                const target = uniqueDebts.find(d => d.userId === route.params?.userId);
-                if (target) {
-                    handleSelect(target);
-                }
-            }
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setProfileLoading(false);
-        }
+    const handleSettlePress = (item: any) => {
+        const isOwe = item.balance < 0; // I owe them
+        setSelectedPeer({
+            userId: item.userId,
+            name: item.name,
+            amount: Math.abs(item.balance),
+            isOwe
+        });
+        setAmount(Math.abs(item.balance).toString());
+        setModalVisible(true);
     };
 
-    const handleSelect = (item: OweItem) => {
-        setSelectedUser(item);
-        setAmount(item.amount.toString()); // Default to full amount
-        setStep('confirm');
-    };
-
-    const handleConfirm = async () => {
-        if (!selectedUser || !amount) return;
+    const handleConfirmSettle = async () => {
+        if (!selectedPeer || !amount) return;
         const val = parseFloat(amount);
         if (isNaN(val) || val <= 0) {
-            Alert.alert("Error", "Invalid amount");
+            Alert.alert("Error", "Please enter a valid amount");
             return;
         }
 
         try {
+            const payerId = selectedPeer.isOwe ? currentUserId! : selectedPeer.userId;
+            const payeeId = selectedPeer.isOwe ? selectedPeer.userId : currentUserId!;
+
             await createSettlement({
-                payerId: currentUserId!,
-                payeeId: selectedUser.userId,
+                payerId,
+                payeeId,
                 amount: val,
-                groupId: selectedUser.groupId,
+                groupId,
                 date: new Date().toISOString()
             }).unwrap();
 
-            setStep('success');
+            setModalVisible(false);
+            setAmount('');
+            setNote('');
+            Alert.alert("Success", "Settlement recorded!");
         } catch (e: any) {
-            Alert.alert("Error", e.data?.error || "Failed");
+            Alert.alert("Error", e.message || "Failed to record.");
         }
     };
 
-    // --- RENDERERS ---
 
-    const renderSelectStep = () => (
-        <View style={styles.stepContainer}>
-            <Text style={styles.header}>Who are you paying?</Text>
-            {isLoadingBalances || profileLoading ? (
-                <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 50 }} />
-            ) : (
-                <FlatList
-                    data={debts}
-                    keyExtractor={item => item.userId}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity style={styles.card} onPress={() => handleSelect(item)}>
-                            <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>{item.profile?.full_name?.charAt(0)}</Text>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.userName}>{item.profile?.full_name}</Text>
-                                <Text style={styles.subtext}>You owe ₹{item.amount.toFixed(2)}</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={20} color="#ccc" />
-                        </TouchableOpacity>
-                    )}
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Ionicons name="checkmark-circle-outline" size={60} color={Colors.success} />
-                            <Text style={styles.emptyText}>You're all settled up!</Text>
-                        </View>
-                    }
-                />
-            )}
-        </View>
-    );
+    // --- 4. RENDERERS ---
 
-    const renderConfirmStep = () => (
-        <View style={styles.stepContainer}>
-            <View style={styles.confirmHeader}>
-                <TouchableOpacity onPress={() => setStep('select')} style={styles.backBtn}>
+    const renderBalanceItem = ({ item }: { item: any }) => {
+        const isOwe = item.balance < 0;
+        const absAmount = Math.abs(item.balance);
+        const color = isOwe ? Colors.error : Colors.success;
+        const text = isOwe ? `You owe` : `Owes you`;
+
+        return (
+            <View style={styles.memberRow}>
+                <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
+                </View>
+                <View style={{ flex: 1, paddingHorizontal: 12 }}>
+                    <Text style={styles.memberName}>{item.name}</Text>
+                    <Text style={[styles.balanceText, { color }]}>{text} ₹{absAmount.toFixed(2)}</Text>
+                </View>
+                <TouchableOpacity
+                    style={[styles.settleBtn, { borderColor: color }]}
+                    onPress={() => handleSettlePress(item)}
+                >
+                    <Text style={[styles.settleBtnText, { color }]}>Settle Up</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    };
+
+    const renderHistoryItem = ({ item }: { item: any }) => {
+        const isPayer = item.payer_id === currentUserId;
+        const isPayee = item.payee_id === currentUserId;
+
+        // Date Formatting
+        const dateObj = new Date(item.date || item.created_at);
+        const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        return (
+            <View style={styles.historyRow}>
+                <Ionicons name="checkmark-circle-outline" size={24} color={Colors.success} />
+                <View style={{ marginLeft: 10, flex: 1 }}>
+                    <Text style={styles.historyText}>
+                        {isPayer ? "You paid" : (isPayee ? "You received" : "Payment")} ₹{item.amount}
+                    </Text>
+                    <Text style={styles.historyDate}>{dateStr}, {timeStr}</Text>
+                </View>
+            </View>
+        );
+    };
+
+    // My Group Summary
+    const myTotal = groupBalances.reduce((acc, curr) => acc + curr.balance, 0);
+
+    return (
+        <ScreenWrapper style={styles.container} edges={['bottom']}>
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Ionicons name="arrow-back" size={24} color="#333" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Confirm Payment</Text>
+                <Text style={styles.headerTitle}>Settle Up: {groupName}</Text>
                 <View style={{ width: 24 }} />
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 20, alignItems: 'center' }}>
-                <View style={styles.avatarLarge}>
-                    <Text style={styles.avatarTextLarge}>{selectedUser?.profile?.full_name?.charAt(0)}</Text>
-                </View>
-                <Text style={styles.payingText}>Paying {selectedUser?.profile?.full_name}</Text>
-
-                <View style={styles.inputWrapper}>
-                    <Text style={styles.currency}>₹</Text>
-                    <TextInput
-                        style={styles.amountInput}
-                        value={amount}
-                        onChangeText={setAmount}
-                        keyboardType="numeric"
-                        autoFocus
-                    />
+            <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+                {/* Summary Card */}
+                <View style={styles.summaryCard}>
+                    <Text style={styles.summaryLabel}>Your Net Balance</Text>
+                    <Text style={[styles.summaryAmount, { color: myTotal >= 0 ? Colors.success : Colors.error }]}>
+                        {myTotal >= 0 ? "+" : "-"}₹{Math.abs(myTotal).toFixed(2)}
+                    </Text>
+                    <Text style={styles.summarySub}>
+                        {myTotal >= 0 ? "You are owed in total" : "You owe in total"}
+                    </Text>
                 </View>
 
-                <Text style={styles.sectionLabel}>Date: Today</Text>
-
-                <Text style={[styles.sectionLabel, { marginTop: 20 }]}>Payment Method</Text>
-                <View style={styles.methodRow}>
-                    {['Cash', 'UPI', 'PayPal'].map((m) => (
-                        <TouchableOpacity
-                            key={m}
-                            style={[styles.methodChip, paymentMethod === m && styles.activeMethod]}
-                            onPress={() => setPaymentMethod(m as PaymentMethod)}
-                        >
-                            <Text style={[styles.methodText, paymentMethod === m && styles.activeMethodText]}>{m}</Text>
-                        </TouchableOpacity>
-                    ))}
+                {/* Balances List */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionHeader}>Balances</Text>
+                    {loadingBalances ? (
+                        <ActivityIndicator />
+                    ) : groupBalances.length === 0 ? (
+                        <View style={styles.emptyBox}>
+                            <Ionicons name="checkmark-done-circle" size={48} color="#ccc" />
+                            <Text style={styles.emptyText}>All settled up!</Text>
+                        </View>
+                    ) : (
+                        groupBalances.map(item => (
+                            <View key={item.userId}>{renderBalanceItem({ item })}</View>
+                        ))
+                    )}
                 </View>
 
-                <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm} disabled={isSaving}>
-                    {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmButtonText}>Confirm Payment</Text>}
-                </TouchableOpacity>
-
+                {/* History List */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionHeader}>History</Text>
+                    {loadingHistory ? (
+                        <ActivityIndicator />
+                    ) : history.length === 0 ? (
+                        <Text style={styles.emptyText}>No recent payments.</Text>
+                    ) : (
+                        history.map((item, idx) => (
+                            <View key={item.id || idx}>{renderHistoryItem({ item })}</View>
+                        ))
+                    )}
+                </View>
             </ScrollView>
-        </View>
-    );
 
-    const renderSuccessStep = () => (
-        <View style={[styles.stepContainer, { justifyContent: 'center', alignItems: 'center' }]}>
-            <Ionicons name="checkmark-circle" size={80} color={Colors.success} />
-            <Text style={styles.successTitle}>Payment Recorded!</Text>
-            <Text style={styles.successSub}>
-                You paid {selectedUser?.profile?.full_name} ₹{parseFloat(amount).toFixed(2)}
-            </Text>
-            <TouchableOpacity style={styles.doneButton} onPress={() => navigation.goBack()}>
-                <Text style={styles.doneButtonText}>Done</Text>
-            </TouchableOpacity>
-        </View>
-    );
+            {/* Settle Up Modal */}
+            <Modal
+                visible={modalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Record Payment</Text>
+                            <TouchableOpacity onPress={() => setModalVisible(false)}>
+                                <Ionicons name="close" size={24} color="#333" />
+                            </TouchableOpacity>
+                        </View>
 
-    return (
-        <ScreenWrapper style={styles.container} edges={['top']}>
-            {step === 'select' && renderSelectStep()}
-            {step === 'confirm' && renderConfirmStep()}
-            {step === 'success' && renderSuccessStep()}
+                        {selectedPeer && (
+                            <View style={styles.modalBody}>
+                                <Text style={styles.modalSubtitle}>
+                                    {selectedPeer.isOwe ? "You are paying" : `${selectedPeer.name} is paying you`}
+                                </Text>
+
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.currency}>₹</Text>
+                                    <TextInput
+                                        style={styles.amountInput}
+                                        value={amount}
+                                        onChangeText={setAmount}
+                                        keyboardType="numeric"
+                                        placeholder="0.00"
+                                    />
+                                </View>
+
+                                {/* Method Chips */}
+                                <Text style={styles.label}>Payment Method</Text>
+                                <View style={styles.chipRow}>
+                                    {['Cash', 'UPI', 'PayPal'].map(m => (
+                                        <TouchableOpacity
+                                            key={m}
+                                            style={[styles.chip, method === m && styles.chipActive]}
+                                            onPress={() => setMethod(m as PaymentMethod)}
+                                        >
+                                            <Text style={[styles.chipText, method === m && styles.textWhite]}>{m}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                {/* Note */}
+                                <Text style={styles.label}>Note (Optional)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={note}
+                                    onChangeText={setNote}
+                                    placeholder="Transaction ID, location, etc."
+                                />
+
+                                <TouchableOpacity
+                                    style={styles.confirmBtn}
+                                    onPress={handleConfirmSettle}
+                                    disabled={isSaving}
+                                >
+                                    {isSaving ? (
+                                        <ActivityIndicator color="#fff" />
+                                    ) : (
+                                        <Text style={styles.confirmBtnText}>Confirm Payment</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </ScreenWrapper>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
-    stepContainer: { flex: 1 },
-    header: { fontSize: 24, fontWeight: 'bold', margin: 20, color: '#333' },
-    confirmHeader: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 20, paddingBottom: 10,
-    },
-    headerTitle: { fontSize: 18, fontWeight: 'bold' },
-    backBtn: {},
+    container: { flex: 1, backgroundColor: '#f9f9f9' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', elevation: 2 },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
 
-    // Select List
-    card: {
-        flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
-    },
-    avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-    avatarText: { fontSize: 20, fontWeight: 'bold', color: '#555' },
-    userName: { fontSize: 16, fontWeight: '600', color: '#333' },
-    subtext: { color: Colors.error },
-    emptyContainer: { alignItems: 'center', marginTop: 80 },
-    emptyText: { marginTop: 16, fontSize: 18, color: '#666', fontWeight: '500' },
+    summaryCard: { margin: 20, padding: 20, backgroundColor: '#fff', borderRadius: 12, alignItems: 'center', elevation: 2 },
+    summaryLabel: { fontSize: 14, color: '#888', textTransform: 'uppercase', marginBottom: 5 },
+    summaryAmount: { fontSize: 32, fontWeight: 'bold' },
+    summarySub: { fontSize: 14, color: '#666', marginTop: 5 },
 
-    // Confirm UI
-    avatarLarge: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-    avatarTextLarge: { fontSize: 32, fontWeight: 'bold', color: '#555' },
-    payingText: { fontSize: 18, color: '#666', marginBottom: 20 },
-    inputWrapper: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: Colors.primary, marginBottom: 30 },
-    currency: { fontSize: 32, fontWeight: 'bold', color: '#333' },
-    amountInput: { fontSize: 40, fontWeight: 'bold', color: '#333', minWidth: 100, textAlign: 'center' },
+    section: { marginTop: 10, paddingHorizontal: 20 },
+    sectionHeader: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, color: '#333' },
 
-    sectionLabel: { fontSize: 14, color: '#999', fontWeight: '600', alignSelf: 'flex-start', marginLeft: 20 },
-    methodRow: { flexDirection: 'row', marginBottom: 40, marginTop: 10 },
-    methodChip: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: '#f0f0f0', marginRight: 10 },
-    activeMethod: { backgroundColor: Colors.primary },
-    methodText: { color: '#666', fontWeight: '600' },
-    activeMethodText: { color: '#fff' },
+    memberRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 10, elevation: 1 },
+    avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' },
+    avatarText: { fontSize: 18, fontWeight: 'bold', color: '#555' },
+    memberName: { fontSize: 16, fontWeight: '600', color: '#333' },
+    balanceText: { fontSize: 14, fontWeight: '500' },
+    settleBtn: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+    settleBtnText: { fontSize: 12, fontWeight: 'bold' },
 
-    confirmButton: { backgroundColor: Colors.success, paddingVertical: 16, width: '100%', borderRadius: 30, alignItems: 'center' },
-    confirmButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+    historyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 8, marginBottom: 8 },
+    historyText: { fontSize: 15, color: '#333', fontWeight: '500' },
+    historyDate: { fontSize: 12, color: '#999' },
 
-    // Success
-    successTitle: { fontSize: 24, fontWeight: 'bold', marginTop: 20, color: '#333' },
-    successSub: { fontSize: 16, color: '#666', marginTop: 10, marginBottom: 40 },
-    doneButton: { paddingVertical: 12, paddingHorizontal: 40, backgroundColor: '#f0f0f0', borderRadius: 24 },
-    doneButtonText: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+    emptyBox: { alignItems: 'center', padding: 20 },
+    emptyText: { color: '#999', marginTop: 10 },
+
+    // Modal
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '80%' },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { fontSize: 20, fontWeight: 'bold' },
+    modalBody: {},
+    modalSubtitle: { fontSize: 16, color: '#666', marginBottom: 20, textAlign: 'center' },
+
+    inputContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 30, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 10 },
+    currency: { fontSize: 24, fontWeight: 'bold', color: '#333', marginRight: 5 },
+    amountInput: { fontSize: 32, fontWeight: 'bold', color: '#333', minWidth: 100, textAlign: 'center' },
+
+    label: { fontSize: 14, fontWeight: '600', color: '#555', marginBottom: 10 },
+    chipRow: { flexDirection: 'row', marginBottom: 20 },
+    chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f0f0f0', marginRight: 10 },
+    chipActive: { backgroundColor: Colors.primary },
+    chipText: { color: '#333', fontWeight: '500' },
+    textWhite: { color: '#fff' },
+
+    input: { backgroundColor: '#f9f9f9', padding: 15, borderRadius: 10, fontSize: 16, marginBottom: 20 },
+
+    confirmBtn: { backgroundColor: Colors.success, padding: 16, borderRadius: 12, alignItems: 'center' },
+    confirmBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' }
 });
