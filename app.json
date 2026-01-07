@@ -11,7 +11,8 @@
         {
           "contactsPermission": "Allow SplitWise to access your contacts to find friends who are already using the app."
         }
-      ]
+      ],
+      "./plugins/withAndroidFonts"
     ],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

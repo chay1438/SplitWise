@@ -65,7 +65,7 @@ export const ExpenseItem = ({ item, onPress, currentUserId, showGroup = false }:
                 )}
                 {!showGroup && (
                     <Text style={styles.subtext}>
-                        {isPayer ? `You paid $${amount.toFixed(2)}` : `Total: $${amount.toFixed(2)}`}
+                        {isPayer ? `You paid ₹${amount.toFixed(2)}` : `Total: ₹${amount.toFixed(2)}`}
                     </Text>
                 )}
             </View>
@@ -75,7 +75,7 @@ export const ExpenseItem = ({ item, onPress, currentUserId, showGroup = false }:
                     {isPayer ? 'you lent' : 'you borrowed'}
                 </Text>
                 <Text style={[styles.amountValue, { color: isPayer ? Colors.success : Colors.error }]}>
-                    ${amount.toFixed(2)}*
+                    ₹{amount.toFixed(2)}*
                 </Text>
             </View>
         </TouchableOpacity>

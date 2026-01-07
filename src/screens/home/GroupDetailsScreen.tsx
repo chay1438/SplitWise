@@ -177,7 +177,7 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
                 <Text style={styles.balanceLabel}>
                     {myTotalBalance >= 0 ? "You are owed" : "You owe"}
                 </Text>
-                <Text style={styles.balanceAmount}>${Math.abs(myTotalBalance).toFixed(2)}</Text>
+                <Text style={styles.balanceAmount}>₹{Math.abs(myTotalBalance).toFixed(2)}</Text>
                 {myTotalBalance < 0 && (
                     <TouchableOpacity style={styles.settleButton} onPress={() => navigation.navigate('SettleUp', { groupId })}>
                         <Text style={styles.settleButtonText}>Settle Up</Text>
@@ -197,7 +197,7 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
                                 {debt.amount > 0 ? `${debt.name} owes you` : `You owe ${debt.name}`}
                             </Text>
                             <Text style={[styles.debtAmount, debt.amount > 0 ? styles.textGreen : styles.textRed]}>
-                                ${Math.abs(debt.amount).toFixed(2)}
+                                ₹{Math.abs(debt.amount).toFixed(2)}
                             </Text>
                         </View>
                     ))}
@@ -215,13 +215,13 @@ export default function GroupDetailsScreen({ route, navigation }: Props) {
         if (isPayer) {
             statusLabel = "You paid";
             statusColor = Colors.success;
-            amountDisplay = `$${item.amount.toFixed(2)}`;
+            amountDisplay = `₹${item.amount.toFixed(2)}`;
         } else {
             const mySplit = item.splits?.find((s: any) => s.user_id === currentUserId);
             if (mySplit) {
                 statusLabel = "You owe";
                 statusColor = Colors.error;
-                amountDisplay = `$${mySplit.amount.toFixed(2)}`;
+                amountDisplay = `₹${mySplit.amount.toFixed(2)}`;
             }
         }
 

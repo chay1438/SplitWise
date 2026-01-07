@@ -86,11 +86,11 @@ export default function HomeScreen() {
             {/* Balance Cards */}
             <View style={styles.balanceContainer}>
                 <View style={[styles.balanceCard, styles.oweCard]}>
-                    <Text style={styles.balanceAmount}>${youOwe.toFixed(2)}</Text>
+                    <Text style={styles.balanceAmount}>₹{youOwe.toFixed(2)}</Text>
                     <Text style={styles.balanceLabel}>You Owe</Text>
                 </View>
                 <View style={[styles.balanceCard, styles.owedCard]}>
-                    <Text style={styles.balanceAmount}>${owesYou.toFixed(2)}</Text>
+                    <Text style={styles.balanceAmount}>₹{owesYou.toFixed(2)}</Text>
                     <Text style={styles.balanceLabel}>Owes you</Text>
                 </View>
             </View>
@@ -207,7 +207,7 @@ const BillItem = ({ title, date, amount, type, icon }: any) => {
                     {type === 'owe' ? 'You Owe' : 'You are owed'}
                 </Text>
                 <Text style={[styles.billAmount, type === 'owe' ? { color: '#FF5A5F' } : { color: '#4CAF50' }]}>
-                    ${amount.toFixed(2)}
+                    ₹{amount.toFixed(2)}
                 </Text>
             </View>
         </View>

@@ -155,7 +155,7 @@ export default function SettleUpScreen({ navigation, route }: Props) {
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.userName}>{item.profile?.full_name}</Text>
-                                <Text style={styles.subtext}>You owe ${item.amount.toFixed(2)}</Text>
+                                <Text style={styles.subtext}>You owe ₹{item.amount.toFixed(2)}</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={20} color="#ccc" />
                         </TouchableOpacity>
@@ -188,7 +188,7 @@ export default function SettleUpScreen({ navigation, route }: Props) {
                 <Text style={styles.payingText}>Paying {selectedUser?.profile?.full_name}</Text>
 
                 <View style={styles.inputWrapper}>
-                    <Text style={styles.currency}>$</Text>
+                    <Text style={styles.currency}>₹</Text>
                     <TextInput
                         style={styles.amountInput}
                         value={amount}
@@ -226,7 +226,7 @@ export default function SettleUpScreen({ navigation, route }: Props) {
             <Ionicons name="checkmark-circle" size={80} color={Colors.success} />
             <Text style={styles.successTitle}>Payment Recorded!</Text>
             <Text style={styles.successSub}>
-                You paid {selectedUser?.profile?.full_name} ${parseFloat(amount).toFixed(2)}
+                You paid {selectedUser?.profile?.full_name} ₹{parseFloat(amount).toFixed(2)}
             </Text>
             <TouchableOpacity style={styles.doneButton} onPress={() => navigation.goBack()}>
                 <Text style={styles.doneButtonText}>Done</Text>

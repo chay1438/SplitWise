@@ -428,7 +428,7 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
 
                             {splitType === 'INDIVIDUAL' && (
                                 <View style={styles.amountInputWrapper}>
-                                    <Text style={styles.currencySymbol}>$</Text>
+                                    <Text style={styles.currencySymbol}>₹</Text>
                                     <TextInput
                                         style={styles.exactInput}
                                         placeholder="0.00"
@@ -467,12 +467,12 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                             const totalAmt = parseFloat(amount) || 0;
                             if (splitType === 'EQUAL') {
                                 const count = involvedUserIds.length;
-                                return count > 0 ? `$${(totalAmt / count).toFixed(2)} / person` : 'Select people';
+                                return count > 0 ? `₹${(totalAmt / count).toFixed(2)} / person` : 'Select people';
                             }
                             if (splitType === 'INDIVIDUAL') {
                                 const currentSum = Object.values(splitValues).reduce((s, v) => s + (parseFloat(v) || 0), 0);
                                 const left = totalAmt - currentSum;
-                                return `Entered: $${currentSum.toFixed(2)} of $${totalAmt.toFixed(2)}\nRemaining: $${left.toFixed(2)}`;
+                                return `Entered: ₹${currentSum.toFixed(2)} of ₹${totalAmt.toFixed(2)}\nRemaining: ₹${left.toFixed(2)}`;
                             }
                             if (splitType === 'PERCENTAGE') {
                                 const currentPct = Object.values(splitPercentages).reduce((s, v) => s + (parseFloat(v) || 0), 0);

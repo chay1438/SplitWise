@@ -101,7 +101,7 @@ export default function FriendDetailScreen({ route, navigation }: Props) {
                 <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.desc}>{item.description}</Text>
                     <Text style={styles.subtext}>
-                        {isPayer ? `You paid $${item.amount.toFixed(2)}` : `${friend?.full_name || 'Friend'} paid $${item.amount.toFixed(2)}`}
+                        {isPayer ? `You paid ₹${item.amount.toFixed(2)}` : `${friend?.full_name || 'Friend'} paid ₹${item.amount.toFixed(2)}`}
                     </Text>
                 </View>
                 <View>
@@ -135,18 +135,18 @@ export default function FriendDetailScreen({ route, navigation }: Props) {
                 </View>
 
                 <Text style={[styles.balanceAmount, { color: netBalance >= 0 ? Colors.success : Colors.error }]}>
-                    {netBalance >= 0 ? `Owes you $${netBalance.toFixed(2)}` : `You owe $${Math.abs(netBalance).toFixed(2)}`}
+                    {netBalance >= 0 ? `Owes you ₹${netBalance.toFixed(2)}` : `You owe ₹${Math.abs(netBalance).toFixed(2)}`}
                 </Text>
 
                 <View style={styles.statsRow}>
                     <View style={styles.statItem}>
                         <Text style={styles.statLabel}>You owe</Text>
-                        <Text style={styles.statValue}>${totalIOwe.toFixed(2)}</Text>
+                        <Text style={styles.statValue}>₹{totalIOwe.toFixed(2)}</Text>
                     </View>
                     <View style={styles.verticalLine} />
                     <View style={styles.statItem}>
                         <Text style={styles.statLabel}>Owes you</Text>
-                        <Text style={styles.statValue}>${totalOwedToMe.toFixed(2)}</Text>
+                        <Text style={styles.statValue}>₹{totalOwedToMe.toFixed(2)}</Text>
                     </View>
                 </View>
 
