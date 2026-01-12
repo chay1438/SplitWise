@@ -6,58 +6,36 @@ import { AppStackParamList } from '../../navigation/types';
 import { SplitType } from '../../types';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
-import { useCreateExpenseMutation, useUpdateExpenseMutation, useDeleteExpenseMutation, useGetExpensesQuery } from '../../store/api/expensesApi';
+import { useCreateExpenseMutation } from '../../store/api/expensesApi';
 import { useGetGroupsQuery, useGetGroupMembersQuery } from '../../store/api/groupsApi';
+
 import { Colors, Typography } from '../../constants';
 import { formatCurrency } from '../../utils';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadImageToSupabase, deleteImageFromSupabase } from '../../services/imageUploadService';
+import { uploadImageToSupabase } from '../../services/imageUploadService';
 import { handleError } from '../../lib/errorHandler';
 
-type Props = NativeStackScreenProps<AppStackParamList, 'AddExpense' | 'EditExpense'>;
+type Props = NativeStackScreenProps<AppStackParamList, 'GroupAddExpense'>;
 
-export default function AddExpenseScreen({ route, navigation }: Props) {
-    const params = (route.params || {}) as any;
-    const { groupId: initialGroupId, expenseId } = params;
-
-    // Determine Mode
-    const isEditing = !!expenseId;
+export default function GroupAddExpenseScreen({ route, navigation }: Props) {
+    const { groupId } = route.params;
 
     const currentUser = useCurrentUser();
     const userId = currentUser.id;
 
     // API Hooks
     const [createExpense, { isLoading: isCreating }] = useCreateExpenseMutation();
-    const [updateExpense, { isLoading: isUpdating }] = useUpdateExpenseMutation();
-    const [deleteExpense] = useDeleteExpenseMutation();
 
-    // Fetches for data
-    const { data: groups } = useGetGroupsQuery(currentUser.id || '', { skip: !currentUser.id });
+    // Fetch Group Data (Specific)
+    const { group } = useGetGroupsQuery(currentUser.id || '', {
+        selectFromResult: ({ data }) => ({
+            group: data?.find(g => g.id === groupId)
+        }),
+        skip: !currentUser.id || !groupId
+    });
 
-    // State for Selected Group (default to params or null)
-    const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>(initialGroupId);
-    const [showGroupModal, setShowGroupModal] = useState(false);
-
-    // Derived Group Data
-    const selectedGroup = groups?.find(g => g.id === selectedGroupId);
-
-    // Fetch Members separately
-    const { data: groupMembers = [] } = useGetGroupMembersQuery(selectedGroupId || '', { skip: !selectedGroupId });
-
-    // MEMOIZED MEMBERS to prevent infinite loops
-    const members = useMemo(() => groupMembers, [groupMembers]);
-    const memberIdsString = useMemo(() => members.map(m => m.id).sort().join(','), [members]);
-
-    // Existing Expense (if editing)
-    const { data: expenses } = useGetExpensesQuery(
-        { groupId: selectedGroupId },
-        { skip: !selectedGroupId || !isEditing }
-    );
-
-    const existingExpense = useMemo(() => {
-        if (!isEditing || !expenses) return null;
-        return expenses.find(e => e.id === expenseId);
-    }, [expenses, expenseId, isEditing]);
+    const { data: members = [] } = useGetGroupMembersQuery(groupId);
+    const memberIdsString = useMemo(() => members.map((m: any) => m.id).sort().join(','), [members]);
 
     // Form State
     const [description, setDescription] = useState('');
@@ -67,15 +45,10 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
     const [receiptImage, setReceiptImage] = useState<string | null>(null);
     const [uploadingImage, setUploadingImage] = useState(false);
 
-    // Edit Mode Specific State
-    const [imageDeleted, setImageDeleted] = useState(false);
-
     // Split State
     const [splitType, setSplitType] = useState<SplitType>('EQUAL');
     const [involvedUserIds, setInvolvedUserIds] = useState<string[]>([]);
-    // Exact Amounts
     const [splitValues, setSplitValues] = useState<Record<string, string>>({});
-    // Percentage Values (0-100)
     const [splitPercentages, setSplitPercentages] = useState<Record<string, string>>({});
 
     // Modals
@@ -84,61 +57,19 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
 
     // --- INITIALIZATION ---
     useEffect(() => {
-        // Init Defaults when group members load and NOT editing
-        if (!isEditing && members.length > 0) {
+        if (members.length > 0) {
             const memberIds = members.map(m => m.id);
             const currentSet = new Set(memberIds);
-
-            // Check if involvedUserIds match EXACTLY the current members
             const isExactMatch = involvedUserIds.length === memberIds.length && involvedUserIds.every(id => currentSet.has(id));
 
             if (!isExactMatch) {
                 setInvolvedUserIds(memberIds);
-                // Reset payer if invalid
                 if (!payerId || !currentSet.has(payerId)) {
                     setPayerId(userId && currentSet.has(userId) ? userId : memberIds[0]);
                 }
             }
         }
-    }, [memberIdsString, userId, isEditing]);
-
-
-    // Init from Existing Expense (EDIT MODE)
-    useEffect(() => {
-        if (isEditing && existingExpense && members.length > 0) {
-            setDescription(existingExpense.description);
-            setAmount(existingExpense.amount.toString());
-            setPayerId(existingExpense.payer_id);
-            setDate(new Date(existingExpense.date));
-            setReceiptImage(existingExpense.receipt_url || null);
-            setImageDeleted(false);
-
-            // Split Initialization Logic
-            const splits = existingExpense.splits || [];
-            const hasSplitData = splits.length > 0;
-
-            let detectedType: SplitType = 'EQUAL';
-            const involved: string[] = splits.map(s => s.user_id);
-            const values: Record<string, string> = {};
-
-            if (hasSplitData) {
-                const firstAmount = splits[0].amount;
-                const isUnequal = splits.some(s => Math.abs(s.amount - firstAmount) > 0.02);
-                if (isUnequal) {
-                    detectedType = 'INDIVIDUAL';
-                    splits.forEach(s => values[s.user_id] = s.amount.toString());
-                } else {
-                    detectedType = 'EQUAL';
-                }
-            }
-
-            setSplitType(detectedType);
-            setInvolvedUserIds(involved.length > 0 ? involved : members.map(m => m.id));
-            setSplitValues(values);
-            // We don't restore Percentages from DB as DB only has amounts. defaulting to Individual is safer.
-        }
-    }, [existingExpense, members, isEditing]);
-
+    }, [memberIdsString, userId]);
 
     // --- HELPERS ---
     const payerName = useMemo(() => {
@@ -157,45 +88,14 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
         });
         if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets.length > 0) {
             setReceiptImage(pickerResult.assets[0].uri);
-            setImageDeleted(false);
         }
     };
 
     const handleRemoveImage = () => {
-        if (receiptImage && receiptImage.startsWith('http')) {
-            setImageDeleted(true);
-        }
         setReceiptImage(null);
     };
 
-    const handleDelete = () => {
-        Alert.alert("Delete Expense", "Are you sure you want to delete this expense permanently?", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Delete",
-                style: "destructive",
-                onPress: async () => {
-                    if (expenseId) {
-                        try {
-                            if (existingExpense?.receipt_url) {
-                                await deleteImageFromSupabase(existingExpense.receipt_url, 'receipts');
-                            }
-                            await deleteExpense(expenseId).unwrap();
-                            navigation.goBack();
-                        } catch (e: any) {
-                            handleError(e, "Failed to delete");
-                        }
-                    }
-                }
-            }
-        ]);
-    };
-
     const handleSave = async () => {
-        if (!selectedGroupId) {
-            Alert.alert('Error', 'Please select a group first');
-            return;
-        }
         if (!description.trim() || !amount.trim()) {
             Alert.alert('Error', 'Please enter description and amount');
             return;
@@ -207,7 +107,7 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
             return;
         }
 
-        // --- Calculate Splits ---
+        // --- Calculate Splits (Same logic as global) ---
         let finalSplits: { userId: string; amount: number }[] = [];
 
         if (splitType === 'EQUAL') {
@@ -244,11 +144,9 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                 Alert.alert("Error", `Percentages (${totalPercent}%) must add up to 100%`);
                 return;
             }
-
-            // Re-verify sum of amounts due to rounding
+            // Re-verify sum
             const sumAmounts = splits.reduce((acc, curr) => acc + curr.amount, 0);
             if (Math.abs(sumAmounts - totalAmount) > 0.05) {
-                // Adjust last remaining cent to match perfectly
                 if (splits.length > 0) {
                     const diff = totalAmount - sumAmounts;
                     splits[0].amount += diff;
@@ -260,97 +158,32 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
 
         setUploadingImage(true);
         try {
-            // --- Image Upload Logic ---
-            let finalReceiptUrl: string | undefined | null = undefined;
-
-            if (isEditing) {
-                // EDIT LOGIC
-                if (imageDeleted) {
-                    finalReceiptUrl = null;
-                    if (existingExpense?.receipt_url) {
-                        deleteImageFromSupabase(existingExpense.receipt_url, 'receipts');
-                    }
-                } else if (receiptImage && !receiptImage.startsWith('http')) {
-                    finalReceiptUrl = await uploadImageToSupabase(receiptImage, 'receipts');
-                    if (existingExpense?.receipt_url) {
-                        deleteImageFromSupabase(existingExpense.receipt_url, 'receipts');
-                    }
-                }
-            } else {
-                // CREATE LOGIC
-                if (receiptImage) {
-                    finalReceiptUrl = await uploadImageToSupabase(receiptImage, 'receipts');
-                }
+            let finalReceiptUrl: string | undefined = undefined;
+            if (receiptImage) {
+                // @ts-ignore
+                finalReceiptUrl = await uploadImageToSupabase(receiptImage, 'receipts');
             }
 
-            if (isEditing) {
-                const updates: any = {
-                    description,
-                    amount: totalAmount,
-                    payer_id: payerId,
-                    date: date.toISOString(),
-                    splits: finalSplits
-                };
+            await createExpense({
+                groupId: groupId,
+                description,
+                amount: totalAmount,
+                date: date.toISOString(),
+                paidBy: payerId!,
+                userId: userId!,
+                splits: finalSplits,
+                receiptUrl: finalReceiptUrl
+            }).unwrap();
 
-                if (imageDeleted) updates.receipt_url = null;
-                else if (typeof finalReceiptUrl === 'string') updates.receipt_url = finalReceiptUrl;
-
-                await updateExpense({ id: expenseId!, updates }).unwrap();
-                Alert.alert('Success', 'Expense updated!');
-            } else {
-                await createExpense({
-                    groupId: selectedGroupId,
-                    description,
-                    amount: totalAmount,
-                    date: date.toISOString(),
-                    paidBy: payerId!,
-                    userId: userId!,
-                    splits: finalSplits,
-                    receiptUrl: typeof finalReceiptUrl === 'string' ? finalReceiptUrl : undefined
-                }).unwrap();
-                Alert.alert('Success', 'Expense added!');
-            }
-
+            Alert.alert('Success', 'Expense added to group!');
             setUploadingImage(false);
             navigation.goBack();
         } catch (error: any) {
             setUploadingImage(false);
-            handleError(error, isEditing ? "Failed to update" : "Failed to save");
+            handleError(error, "Failed to save");
         }
     };
 
-
-    // --- UNIFIED RENDER ---
-    const renderGroupModal = () => (
-        <Modal visible={showGroupModal} animationType="slide" presentationStyle="pageSheet">
-            <View style={styles.modalContainer}>
-                <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Select Group</Text>
-                    <TouchableOpacity onPress={() => setShowGroupModal(false)}><Text style={styles.closeText}>Close</Text></TouchableOpacity>
-                </View>
-                <FlatList
-                    data={groups}
-                    keyExtractor={item => item.id}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            style={[styles.memberRow, selectedGroupId === item.id && styles.selectedRow]}
-                            onPress={() => { setSelectedGroupId(item.id); setShowGroupModal(false); }}
-                        >
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                {item.avatar_url ? (
-                                    <Image source={{ uri: item.avatar_url }} style={styles.avatarSmall} />
-                                ) : (
-                                    <View style={styles.avatarSmall}><Text>{item.name.charAt(0)}</Text></View>
-                                )}
-                                <Text style={styles.memberName}>{item.name}</Text>
-                            </View>
-                            {selectedGroupId === item.id && <Ionicons name="checkmark" size={20} color={Colors.primary} />}
-                        </TouchableOpacity>
-                    )}
-                />
-            </View>
-        </Modal>
-    );
 
     const renderPayerModal = () => (
         <Modal visible={showPayerModal} animationType="slide" presentationStyle="pageSheet">
@@ -384,12 +217,12 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                     <TouchableOpacity onPress={() => setShowSplitModal(false)}><Text style={styles.closeText}>Done</Text></TouchableOpacity>
                 </View>
 
-                {/* New Feature: Add Friend to Group Link */}
+                {/* Groups Context */}
                 <TouchableOpacity
                     style={styles.addMemberLink}
                     onPress={() => {
                         setShowSplitModal(false);
-                        if (selectedGroupId) navigation.navigate('AddGroupMember', { groupId: selectedGroupId });
+                        navigation.navigate('AddGroupMember', { groupId: groupId });
                     }}
                 >
                     <Ionicons name="person-add-outline" size={20} color={Colors.primary} />
@@ -490,45 +323,41 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
         </Modal>
     );
 
-    const isWorking = isCreating || isUpdating || uploadingImage;
+    const isWorking = isCreating || uploadingImage;
 
     return (
-        <ScreenWrapper style={{ flex: 1 }} edges={['top']} gradient={[Colors.primary, Colors.primaryDark]}>
+        <ScreenWrapper
+            style={{ flex: 1 }}
+            edges={['top']}
+            gradient={[Colors.primary, Colors.primaryDark]}
+        >
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-                {/* Header (Transparent for gradient) */}
+                {/* Header (Transparent over Gradient) */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()}>
                         <Text style={styles.cancelButton}>Cancel</Text>
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{isEditing ? 'Edit Expense' : 'Add Expense'}</Text>
+                    <Text style={styles.headerTitle}>Add Expense</Text>
                     <TouchableOpacity onPress={handleSave} disabled={isWorking}>
                         {isWorking ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButton}>Save</Text>}
                     </TouchableOpacity>
                 </View>
 
-                {/* Content in White Card */}
+                {/* Form Container (White Card) */}
                 <View style={styles.formContainer}>
                     <ScrollView contentContainerStyle={styles.content}>
 
-                        {/* Group Selector */}
-                        <TouchableOpacity
-                            style={styles.groupSelector}
-                            onPress={() => !isEditing && setShowGroupModal(true)}
-                            disabled={isEditing}
-                        >
-                            {selectedGroup?.avatar_url ? (
-                                <Image source={{ uri: selectedGroup.avatar_url }} style={styles.groupSelectorImage} />
+                        {/* Group Indicator (Static) */}
+                        <View style={styles.groupIndicator}>
+                            {group?.avatar_url ? (
+                                <Image source={{ uri: group.avatar_url }} style={styles.groupSelectorImage} />
                             ) : (
-                                <View style={styles.iconBox}>
-                                    <Ionicons name="people-outline" size={24} color={Colors.primary} />
+                                <View style={styles.iconBoxSmall}>
+                                    <Ionicons name="people" size={16} color="#fff" />
                                 </View>
                             )}
-
-                            <Text style={styles.groupSelectorText}>
-                                {selectedGroup ? selectedGroup.name : "Select a Group"}
-                            </Text>
-                            {!isEditing && <Ionicons name="chevron-forward" size={20} color="#ccc" />}
-                        </TouchableOpacity>
+                            <Text style={styles.groupIndicatorText}>Group: {group?.name || 'Loading...'}</Text>
+                        </View>
 
                         {/* Inputs */}
                         <View style={styles.inputRow}>
@@ -538,7 +367,7 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                                 placeholder="Enter description"
                                 value={description}
                                 onChangeText={setDescription}
-                                autoFocus={!isEditing}
+                                autoFocus
                             />
                         </View>
 
@@ -556,26 +385,18 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                         <View style={styles.divider} />
 
                         {/* Paid By & Split Logic */}
-                        {selectedGroupId ? (
-                            <View style={styles.splitSummary}>
-                                <Text style={styles.summaryText}>Paid by</Text>
-                                <TouchableOpacity onPress={() => setShowPayerModal(true)} style={styles.pill}>
-                                    <Text style={styles.pillText}>{payerName}</Text>
-                                </TouchableOpacity>
-                                <Text style={styles.summaryText}>and split</Text>
-                                <TouchableOpacity onPress={() => setShowSplitModal(true)} style={styles.pill}>
-                                    <Text style={styles.pillText}>
-                                        {splitType === 'EQUAL' ? 'equally' : splitType === 'PERCENTAGE' ? 'by %' : 'unequally'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <TouchableOpacity onPress={() => Alert.alert('Attention', 'Please select a group first')} style={{ padding: 10 }}>
-                                <Text style={{ textAlign: 'center', color: Colors.primary, fontStyle: 'italic', textDecorationLine: 'underline' }}>
-                                    Select a group to split expenses
+                        <View style={styles.splitSummary}>
+                            <Text style={styles.summaryText}>Paid by</Text>
+                            <TouchableOpacity onPress={() => setShowPayerModal(true)} style={styles.pill}>
+                                <Text style={styles.pillText}>{payerName}</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.summaryText}>and split</Text>
+                            <TouchableOpacity onPress={() => setShowSplitModal(true)} style={styles.pill}>
+                                <Text style={styles.pillText}>
+                                    {splitType === 'EQUAL' ? 'equally' : splitType === 'PERCENTAGE' ? 'by %' : 'unequally'}
                                 </Text>
                             </TouchableOpacity>
-                        )}
+                        </View>
 
                         {/* Date Display (Read only for now) */}
                         <View style={styles.dateRow}>
@@ -601,21 +422,11 @@ export default function AddExpenseScreen({ route, navigation }: Props) {
                                 </View>
                             )}
                         </View>
-
-                        {/* Delete Button (Only in Edit Mode) */}
-                        {isEditing && (
-                            <View style={{ marginTop: 40, borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 20 }}>
-                                <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-                                    <Text style={styles.deleteText}>Delete Expense</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
                     </ScrollView>
                 </View>
 
                 {renderPayerModal()}
                 {renderSplitModal()}
-                {renderGroupModal()}
             </KeyboardAvoidingView>
         </ScreenWrapper>
     );
@@ -628,16 +439,19 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderTopLeftRadius: 30,
         borderTopRightRadius: 30,
-        overflow: 'hidden',
+        overflow: 'hidden', // Clipping
     },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 20, paddingTop: 10 },
     headerTitle: { ...Typography.h3, fontSize: 18, color: '#fff' },
     cancelButton: { ...Typography.button, color: 'rgba(255,255,255,0.8)' },
     saveButton: { ...Typography.button, color: '#fff', fontWeight: 'bold' },
     content: { padding: 20 },
-    groupSelector: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, padding: 12, backgroundColor: '#f9f9f9', borderRadius: 8, borderWidth: 1, borderColor: '#eee' },
-    groupSelectorText: { ...Typography.body1, fontWeight: '600', color: '#333', flex: 1, marginLeft: 12 },
-    groupSelectorImage: { width: 40, height: 40, borderRadius: 8, marginRight: 12 },
+
+    groupIndicator: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, padding: 8, backgroundColor: '#f0f9ff', borderRadius: 20, alignSelf: 'flex-start' },
+    groupIndicatorText: { ...Typography.body2, fontWeight: '600', color: Colors.primary, marginLeft: 8, marginRight: 8 },
+    groupSelectorImage: { width: 24, height: 24, borderRadius: 12 },
+    iconBoxSmall: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+
     inputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
     iconBox: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5', borderRadius: 8, marginRight: 12 },
     descInput: { ...Typography.body1, fontSize: 18, flex: 1, borderBottomWidth: 1, borderBottomColor: '#ccc', paddingVertical: 8 },

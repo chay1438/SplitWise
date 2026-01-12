@@ -94,41 +94,56 @@ export default function NotificationsScreen() {
     );
 
     return (
-        <ScreenWrapper edges={['top']} style={{ backgroundColor: '#fff' }}>
+        <ScreenWrapper
+            gradient={[Colors.primary, Colors.primaryDark]}
+            style={styles.container}
+            edges={['top']}
+            statusBarStyle="light-content"
+        >
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Notifications</Text>
                 <View style={styles.headerActions}>
                     <TouchableOpacity onPress={handleMarkAllRead} style={styles.actionBtn}>
-                        <Ionicons name="checkmark-done-outline" size={24} color={Colors.primary} />
+                        <Ionicons name="checkmark-done-outline" size={24} color="#fff" />
                     </TouchableOpacity>
                 </View>
             </View>
 
-            <SectionList
-                sections={sections}
-                keyExtractor={item => item.id}
-                renderItem={renderItem}
-                renderSectionHeader={({ section: { title } }) => (
-                    <Text style={styles.sectionHeader}>{title}</Text>
-                )}
-                contentContainerStyle={styles.listContent}
-                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} />}
-                ListEmptyComponent={<Text style={styles.emptyText}>No notifications</Text>}
-                stickySectionHeadersEnabled={false}
-            />
+            <View style={styles.sheetContainer}>
+                <SectionList
+                    sections={sections}
+                    keyExtractor={item => item.id}
+                    renderItem={renderItem}
+                    renderSectionHeader={({ section: { title } }) => (
+                        <Text style={styles.sectionHeader}>{title}</Text>
+                    )}
+                    contentContainerStyle={styles.listContent}
+                    refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={Colors.primary} />}
+                    ListEmptyComponent={<Text style={styles.emptyText}>No notifications</Text>}
+                    stickySectionHeadersEnabled={false}
+                />
+            </View>
         </ScreenWrapper>
     );
 }
 
 const styles = StyleSheet.create({
+    container: { flex: 1 },
     header: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0'
+        paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20,
+        // removed borders
     },
-    headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#333' },
+    headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
     headerActions: { flexDirection: 'row' },
     actionBtn: { padding: 8 },
-
+    sheetContainer: {
+        flex: 1,
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        overflow: 'hidden',
+    },
     listContent: { paddingBottom: 20 },
     sectionHeader: {
         fontSize: 14, fontWeight: 'bold', color: '#999', backgroundColor: '#fff',

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, RefreshControl } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { Colors, AppConfig } from '../../constants';
 import { useNavigation } from '@react-navigation/native';
@@ -49,6 +49,7 @@ export default function HomeScreen() {
 
     // State
     const [refreshing, setRefreshing] = useState(false);
+    const [showAllGroups, setShowAllGroups] = useState(false);
 
     // Derived Balance State (using backend data now!)
     const netBalance = balanceSummary?.netBalance || 0;
@@ -65,6 +66,10 @@ export default function HomeScreen() {
         ]);
         setRefreshing(false);
     }
+
+    const toggleShowAll = () => {
+        setShowAllGroups(!showAllGroups);
+    };
 
     const renderHeader = () => (
         <View>
@@ -99,9 +104,9 @@ export default function HomeScreen() {
             <View style={styles.dashboardContainer}>
                 <View style={styles.dashboard}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>My Groups</Text>
-                        <TouchableOpacity>
-                            <Text style={styles.seeAll}>View All</Text>
+                        <Text style={styles.sectionTitle}>Groups</Text>
+                        <TouchableOpacity onPress={toggleShowAll}>
+                            <Text style={styles.seeAll}>{showAllGroups ? 'View Less' : 'View All'}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -137,7 +142,8 @@ export default function HomeScreen() {
     );
 
     // Balances Query (Group Level)
-    const { data: balanceData = [] } = useGetBalancesQuery(currentUser.id || '', { skip: !currentUser.id });
+    const { data: balanceData = [], isLoading: balancesLoading } = useGetBalancesQuery(currentUser.id || '', { skip: !currentUser.id });
+    const isLoading = groupsLoading || expensesLoading || balanceLoading || balancesLoading;
 
     // Merge Groups with Balances
     const groupsWithBalances = React.useMemo(() => {
@@ -156,6 +162,8 @@ export default function HomeScreen() {
         });
     }, [groups, balanceData]);
 
+    const displayedGroups = showAllGroups ? groupsWithBalances : groupsWithBalances.slice(0, 5);
+
     return (
         <ScreenWrapper
             gradient={[Colors.primary, Colors.primaryDark]}
@@ -163,7 +171,7 @@ export default function HomeScreen() {
             statusBarStyle="light-content"
         >
             <FlatList
-                data={groupsWithBalances}
+                data={displayedGroups}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                     <View style={styles.dashContent}>
@@ -183,7 +191,14 @@ export default function HomeScreen() {
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={() => (
                     <View style={[styles.dashContent, { padding: 40, alignItems: 'center' }]}>
-                        <Text style={{ color: '#999' }}>No Groups yet. Create one!</Text>
+                        {isLoading ? (
+                            <View style={{ marginTop: 20 }}>
+                                <ActivityIndicator size="large" color={Colors.primary} />
+                                <Text style={{ marginTop: 10, color: '#999' }}>Loading your groups...</Text>
+                            </View>
+                        ) : (
+                            <Text style={{ color: '#999' }}>No Groups yet. Create one!</Text>
+                        )}
                     </View>
                 )}
             />
@@ -314,7 +329,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f9fa',
         paddingHorizontal: 20,
         paddingTop: 10,
-        paddingBottom: 100, // Space for bottom tabs
+        paddingBottom: 20, // Reduced from 100 since it is now fixed above tabs
     },
     sectionHeader: {
         flexDirection: 'row',

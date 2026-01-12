@@ -17,33 +17,33 @@ export const notificationsApiSlice = apiSlice.injectEndpoints({
             },
             providesTags: ['Notifications']
         }),
-        markAsRead: builder.mutation<void, string>({
+        markAsRead: builder.mutation<null, string>({
             queryFn: async (notificationId) => {
                 try {
                     await notificationService.markAsRead(notificationId);
-                    return { data: undefined };
+                    return { data: null };
                 } catch (error: any) {
                     return { error: error.message };
                 }
             },
             invalidatesTags: ['Notifications']
         }),
-        markAllAsRead: builder.mutation<void, string>({
+        markAllAsRead: builder.mutation<null, string>({
             queryFn: async (userId) => {
                 try {
                     await notificationService.markAllAsRead(userId);
-                    return { data: undefined };
+                    return { data: null };
                 } catch (error: any) {
                     return { error: error.message };
                 }
             },
             invalidatesTags: ['Notifications']
         }),
-        deleteNotification: builder.mutation<void, string>({
+        deleteNotification: builder.mutation<null, string>({
             queryFn: async (notificationId) => {
                 try {
                     await notificationService.deleteNotification(notificationId);
-                    return { data: undefined };
+                    return { data: null };
                 } catch (error: any) {
                     return { error: error.message };
                 }

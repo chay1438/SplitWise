@@ -10,11 +10,12 @@ import { useAuth } from '../../hooks/useAuth';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../constants';
 
-type Props = NativeStackScreenProps<AppStackParamList, 'SettleUp'>;
+type Props = NativeStackScreenProps<AppStackParamList, 'GroupSettleUp'>;
 
 type PaymentMethod = 'Cash' | 'UPI' | 'PayPal' | 'Other';
 
-export default function SettleUpScreen({ navigation, route }: Props) {
+
+export default function GroupSettleUpScreen({ navigation, route }: Props) {
     const groupId = route.params?.groupId;
     const { user } = useAuth();
     const currentUserId = user?.id;

@@ -31,7 +31,7 @@ export default function WelcomeScreen({ navigation }: any) {
         {/* Buttons */}
         <View style={styles.buttonsContainer}>
           <TouchableOpacity style={styles.googleButton}>
-            <AntDesign name="google" size={20} color="#EA4335" style={styles.buttonIcon} />
+            <Ionicons name="logo-google" size={20} color="#ea4435ff" style={styles.buttonIcon} />
             <Text style={styles.googleButtonText}>Continue with Google</Text>
           </TouchableOpacity>
 

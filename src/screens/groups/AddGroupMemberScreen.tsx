@@ -1,240 +1,135 @@
-import React, { useState, useEffect } from 'react';
-import {
-    View,
-    Text,
-    TextInput,
-    FlatList,
-    TouchableOpacity,
-    Alert,
-    ActivityIndicator,
-    Share
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import * as Contacts from 'expo-contacts';
-import { contactService } from '../../services/contactService';
-import { useSendFriendRequestMutation } from '../../store/api/friendsApi';
-import { useAuth } from '../../hooks/useAuth';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AppStackParamList } from '../../navigation/types';
+import { Colors } from '../../constants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useGetFriendsQuery } from '../../store/api/friendsApi';
+import { useAddMemberMutation, useGetGroupMembersQuery } from '../../store/api/groupsApi';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
+import { invitationService } from '../../services/invitationService';
 
-const AddGroupMemberScreen = ({ route }: any) => {
-    const navigation = useNavigation();
-    const { user } = useAuth();
+export default function AddGroupMemberScreen() {
+    const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+    const route = useRoute<any>();
     const { groupId } = route.params || {};
-
-    const [sendRequest] = useSendFriendRequestMutation();
+    const currentUser = useCurrentUser();
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [allContacts, setAllContacts] = useState<any[]>([]);
-    const [matchedUsers, setMatchedUsers] = useState<any[]>([]);
-    const [unmatchedContacts, setUnmatchedContacts] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [hasPermission, setHasPermission] = useState(false);
 
-    useEffect(() => {
-        checkPermissionAndLoadContacts();
-    }, []);
+    // 1. Fetch Data
+    const { data: friends = [], isLoading: loadingFriends } = useGetFriendsQuery(currentUser.id || '', { skip: !currentUser.id });
+    const { data: groupMembers = [] } = useGetGroupMembersQuery(groupId, { skip: !groupId });
 
-    const checkPermissionAndLoadContacts = async () => {
-        try {
-            const { status } = await Contacts.getPermissionsAsync();
+    // 2. Mutation
+    const [addMember, { isLoading: isAdding }] = useAddMemberMutation();
 
-            if (status === 'granted') {
-                setHasPermission(true);
-                loadContacts();
-            } else {
-                // Request permission
-                const { status: newStatus } = await Contacts.requestPermissionsAsync();
-                if (newStatus === 'granted') {
-                    setHasPermission(true);
-                    loadContacts();
-                } else {
-                    Alert.alert(
-                        'Permission Required',
-                        'Please grant contacts access to add group members.',
-                        [{ text: 'OK', onPress: () => navigation.goBack() }]
-                    );
-                }
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Failed to access contacts');
-        }
-    };
+    // 3. Filter Friends (only show those NOT in group)
+    const existingMemberIds = new Set(groupMembers.map((m: any) => m.id));
 
-    const loadContacts = async () => {
-        if (!user) return;
-        setLoading(true);
-        try {
-            const result = await contactService.findFriendsFromContacts(user.id);
+    const availableFriends = friends.filter(f => !existingMemberIds.has(f.id));
 
-            setMatchedUsers(result.matched);
-            setUnmatchedContacts(result.unmatched);
-            setAllContacts([...result.matched, ...result.unmatched]);
-        } catch (error) {
-            Alert.alert('Error', 'Failed to load contacts');
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Filter contacts based on search
-    const filteredMatched = matchedUsers.filter(user =>
-        user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.phone_number?.includes(searchQuery)
+    const filteredFriends = availableFriends.filter(f =>
+        (f.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (f.email || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const filteredUnmatched = unmatchedContacts.filter(contact =>
-        contact.name?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    // Add registered user as friend and to group
-    const handleAddRegisteredUser = async (userId: string, userName: string) => {
-        if (!user) return;
+    const handleAddMember = async (friendId: string, name: string) => {
+        if (!groupId) return;
         try {
-            // Send friend request
-            await sendRequest({
-                fromUserId: user.id,
-                toUserId: userId
-            }).unwrap();
-
-            // If groupId provided, add to group logic would go here
-            // For now we just friend request them
-
-            Alert.alert(
-                'Success',
-                `Friend request sent to ${userName}!${groupId ? ' They will be added to the group once they accept.' : ''}`
-            );
-        } catch (error) {
-            Alert.alert('Error', 'Failed to send friend request');
+            await addMember({ groupId, userId: friendId }).unwrap();
+            Alert.alert("Success", `${name} added to the group!`);
+        } catch (error: any) {
+            Alert.alert("Error", error.message || "Failed to add member");
         }
     };
 
-    // Invite unregistered user
-    const handleInviteUser = async (contactName: string) => {
-        const message = `Hey ${contactName}! Join me on SplitWise to split expenses easily. Download: https://splitwise.app`;
-
-        try {
-            await Share.share({
-                message,
-                title: 'Join SplitWise'
-            });
-        } catch (error) {
-            console.error('Error sharing:', error);
-        }
+    // Invite Link Logic (Fallback)
+    const handleInviteLink = async () => {
+        await invitationService.shareGroupInvite(groupId, 'this group');
     };
 
-    if (loading) {
-        return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#6366F1" />
-                <Text style={{ marginTop: 10, color: '#6B7280' }}>Loading contacts...</Text>
-            </View>
-        );
-    }
-
-    return (
-        <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
-            {/* Search Bar */}
-            <View style={{ padding: 16, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 8, paddingHorizontal: 10 }}>
-                    <Ionicons name="search" size={20} color="#9CA3AF" />
-                    <TextInput
-                        placeholder="Search by name, email, or phone"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        style={{
-                            flex: 1,
-                            padding: 12,
-                            fontSize: 16,
-                            color: '#1F2937'
-                        }}
-                    />
+    const renderItem = ({ item }: { item: any }) => (
+        <View style={styles.itemContainer}>
+            <View style={styles.userInfo}>
+                <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{(item.full_name || '?').charAt(0).toUpperCase()}</Text>
+                </View>
+                <View>
+                    <Text style={styles.name}>{item.full_name || item.email}</Text>
+                    <Text style={styles.email}>{item.email}</Text>
                 </View>
             </View>
-
-            <FlatList
-                data={[
-                    ...filteredMatched.map(u => ({ ...u, isRegistered: true })),
-                    ...filteredUnmatched.map(c => ({ ...c, isRegistered: false }))
-                ]}
-                keyExtractor={(item: any) => item.id || item.contactId || item.lookupKey || Math.random().toString()}
-                contentContainerStyle={{ paddingBottom: 20 }}
-                ListHeaderComponent={() => (
-                    <View style={{ padding: 16 }}>
-                        <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 12 }}>
-                            All Contacts ({filteredMatched.length + filteredUnmatched.length})
-                        </Text>
-                    </View>
-                )}
-                renderItem={({ item }: { item: any }) => (
-                    <View
-                        style={{
-                            backgroundColor: 'white',
-                            padding: 16,
-                            marginHorizontal: 16,
-                            marginBottom: 12,
-                            borderRadius: 12,
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.1,
-                            shadowRadius: 4,
-                            elevation: 3
-                        }}
-                    >
-                        <View style={{ flex: 1, marginRight: 10 }}>
-                            <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
-                                {item.full_name || item.name}
-                            </Text>
-                            <Text style={{ fontSize: 14, color: '#6B7280' }} numberOfLines={1}>
-                                {item.email || (item.phoneNumbers && item.phoneNumbers[0]?.number) || 'No contact info'}
-                            </Text>
-                            {item.isRegistered && (
-                                <Text style={{ fontSize: 12, color: '#10B981', marginTop: 2 }}>
-                                    ✓ On SplitWise
-                                </Text>
-                            )}
-                            {!item.isRegistered && (
-                                <Text style={{ fontSize: 12, color: '#EF4444', marginTop: 2 }}>
-                                    ⚠️ Not registered
-                                </Text>
-                            )}
-                        </View>
-                        <TouchableOpacity
-                            style={{
-                                backgroundColor: item.isRegistered ? '#6366F1' : '#E5E7EB',
-                                paddingHorizontal: 16,
-                                paddingVertical: 8,
-                                borderRadius: 8
-                            }}
-                            onPress={() =>
-                                item.isRegistered
-                                    ? handleAddRegisteredUser(item.id, item.full_name)
-                                    : handleInviteUser(item.name)
-                            }
-                        >
-                            <Text style={{
-                                color: item.isRegistered ? 'white' : '#374151',
-                                fontWeight: '600'
-                            }}>
-                                {item.isRegistered ? 'Add' : 'Invite'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-                ListEmptyComponent={() => (
-                    <View style={{ padding: 40, alignItems: 'center' }}>
-                        <Text style={{ fontSize: 16, color: '#6B7280', textAlign: 'center' }}>
-                            No contacts found matching your search.
-                        </Text>
-                    </View>
-                )}
-            />
+            <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => handleAddMember(item.id, item.full_name || item.email)}
+                disabled={isAdding}
+            >
+                <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
         </View>
     );
-};
 
-export default AddGroupMemberScreen;
+    return (
+        <View style={styles.container}>
+            {/* Header Search */}
+            <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#888" style={{ marginRight: 8 }} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search your friends..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoCapitalize="none"
+                />
+            </View>
+
+            {/* Action: Invite via Link */}
+            <TouchableOpacity style={styles.inviteLinkButton} onPress={handleInviteLink}>
+                <Ionicons name="link-outline" size={20} color={Colors.primary} />
+                <Text style={styles.inviteLinkText}>Invite via Link (for non-friends)</Text>
+            </TouchableOpacity>
+
+            {loadingFriends ? (
+                <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />
+            ) : (
+                <FlatList
+                    data={filteredFriends}
+                    keyExtractor={item => item.id}
+                    renderItem={renderItem}
+                    contentContainerStyle={{ paddingBottom: 20 }}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>
+                                {searchQuery ? "No friends found." : "No new friends to add."}
+                            </Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('AddFriend')} style={{ marginTop: 10 }}>
+                                <Text style={styles.addFriendLink}>+ Add New Friend to SplitWise</Text>
+                            </TouchableOpacity>
+                        </View>
+                    }
+                />
+            )}
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#fff' },
+    searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f5f5f5', margin: 16, padding: 12, borderRadius: 12 },
+    searchInput: { flex: 1, fontSize: 16 },
+    itemContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+    userInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+    avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    avatarText: { fontSize: 16, fontWeight: 'bold', color: '#555' },
+    name: { fontSize: 16, fontWeight: '600', color: '#333' },
+    email: { fontSize: 14, color: '#888' },
+    addButton: { backgroundColor: Colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+    addButtonText: { color: '#fff', fontWeight: '600' },
+    inviteLinkButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: '#f9f9f9', marginBottom: 8 },
+    inviteLinkText: { color: Colors.primary, marginLeft: 8, fontWeight: '600' },
+    emptyContainer: { alignItems: 'center', marginTop: 40 },
+    emptyText: { color: '#888', marginBottom: 12, fontSize: 16 },
+    addFriendLink: { color: Colors.primary, fontWeight: 'bold', fontSize: 16 }
+});

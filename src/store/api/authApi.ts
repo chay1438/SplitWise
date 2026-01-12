@@ -7,6 +7,7 @@ import { setSession, setUser, setLoading } from '../slices/authSlice';
 import { authService } from '../../services/authService';
 
 export const authApiSlice = apiSlice.injectEndpoints({
+    overrideExisting: true,
     endpoints: (builder) => ({
         initializeAuth: builder.query<{ session: Session | null, user: Profile | null }, void>({
             queryFn: async () => {
@@ -100,8 +101,27 @@ export const authApiSlice = apiSlice.injectEndpoints({
                     return { error: error.message };
                 }
             }
+        }),
+        updateProfile: builder.mutation<Profile, Partial<Profile> & { id: string }>({
+            queryFn: async ({ id, ...updates }) => {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .update(updates)
+                    .eq('id', id)
+                    .select()
+                    .single();
+
+                if (error) return { error: error.message };
+                return { data };
+            },
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    const { data: updatedProfile } = await queryFulfilled;
+                    dispatch(setUser(updatedProfile));
+                } catch { }
+            }
         })
     }),
 });
 
-export const { useInitializeAuthQuery, useSignOutMutation, useSignInMutation, useSignUpMutation, useResetPasswordMutation, useUpdatePasswordMutation } = authApiSlice;
+export const { useInitializeAuthQuery, useSignOutMutation, useSignInMutation, useSignUpMutation, useResetPasswordMutation, useUpdatePasswordMutation, useUpdateProfileMutation } = authApiSlice;

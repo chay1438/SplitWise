@@ -8,6 +8,13 @@ import GroupSettleUpScreen from '../screens/home/GroupSettleUpScreen';
 import { AppStackParamList } from './types';
 import AddGroupMemberScreen from '../screens/groups/AddGroupMemberScreen';
 
+import EditGroupScreen from '../screens/groups/EditGroupScreen';
+import GroupMembersScreen from '../screens/groups/GroupMembersScreen';
+import GroupSettingsScreen from '../screens/groups/GroupSettingsScreen';
+import ExitGroupScreen from '../screens/groups/ExitGroupScreen';
+import DeleteGroupScreen from '../screens/groups/DeleteGroupScreen';
+import GroupAddExpenseScreen from '../screens/groups/GroupAddExpenseScreen';
+
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
 export default function AppStack() {
@@ -20,22 +27,59 @@ export default function AppStack() {
             <Stack.Screen
                 name="MakeGroup"
                 component={MakeGroupScreen}
-                options={{ title: 'Create New Group', headerShown: true }}
+                options={{ title: 'Create New Group', headerShown: false }}
             />
             <Stack.Screen
                 name="EditGroup"
-                component={MakeGroupScreen}
-                options={{ title: 'Edit Group', headerShown: true }}
+                component={EditGroupScreen}
+                options={{ title: 'Edit Group', headerShown: false }}
+            />
+            <Stack.Screen
+                name="GroupMembers"
+                component={GroupMembersScreen}
+                options={{ title: 'Group Members', headerShown: false }} // Assuming ScreenWrapper handles header or customized header
             />
             <Stack.Screen
                 name="GroupDetails"
                 component={GroupDetailsScreen}
-                options={{ title: 'Group Details', headerShown: true }}
+                options={{ title: 'Group Details', headerShown: false }}
+            />
+            <Stack.Screen
+                name="GroupSettings"
+                component={GroupSettingsScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'transparentModal',
+                    animation: 'fade'
+                }}
+            />
+            <Stack.Screen
+                name="ExitGroup"
+                component={ExitGroupScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'transparentModal',
+                    animation: 'fade'
+                }}
+            />
+            <Stack.Screen
+                name="DeleteGroup"
+                component={DeleteGroupScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'transparentModal',
+                    animation: 'fade'
+                }}
             />
             <Stack.Screen
                 name="AddExpense"
                 component={AddExpenseScreen}
                 options={{ title: 'Add Expense', headerShown: true }}
+            />
+            <Stack.Screen
+                name="GroupAddExpense"
+                component={GroupAddExpenseScreen}
+                options={{ title: 'Add Group Expense', headerShown: false }}
             />
             <Stack.Screen
                 name="GroupSettleUp"
@@ -91,6 +135,11 @@ export default function AppStack() {
                 name="AddFriend"
                 component={require('../screens/home/AddFriendScreen').default}
                 options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="EditProfile"
+                component={require('../screens/home/EditProfileScreen').default}
+                options={{ headerShown: false }}
             />
         </Stack.Navigator>
     );

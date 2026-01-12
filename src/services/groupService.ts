@@ -17,9 +17,9 @@ export const groupService = {
             .from('groups')
             .select(`
                 *,
-                members:group_members(
-                    role,
-                    profile:profiles!user_id(*)
+                group_members ( 
+                    user_id,
+                    profile:profiles (*)
                 )
             `)
             .in('id', groupIds)
@@ -27,13 +27,33 @@ export const groupService = {
 
         if (error) throw error;
 
-        return data.map((g: any) => ({
-            ...g,
-            members: g.members.map((m: any) => ({
+        // Transform to GroupWithMembers
+        return data.map((group: any) => ({
+            ...group,
+            members: group.group_members
+                .map((gm: any) => gm.profile)
+                .filter((p: any) => p !== null), // Filter out null profiles if any
+            member_count: group.group_members.length
+        })) as GroupWithMembers[];
+    },
+
+    async getGroupMembers(groupId: string): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('group_members')
+            .select(`
+                role,
+                profile:profiles!user_id(*)
+            `)
+            .eq('group_id', groupId);
+
+        if (error) throw error;
+
+        return data
+            .filter((m: any) => m.profile)
+            .map((m: any) => ({
                 ...m.profile,
                 role: m.role || 'member'
-            })).filter((m: any) => m.id) // Ensure profile exists
-        })) as GroupWithMembers[];
+            }));
     },
 
     async createGroup(data: { name: string; type: string; createdBy: string; memberIds?: string[]; avatar_url?: string }): Promise<Group> {

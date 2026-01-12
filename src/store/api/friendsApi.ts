@@ -19,11 +19,11 @@ export const friendsApiSlice = apiSlice.injectEndpoints({
             providesTags: ['Friends']
         }),
 
-        sendFriendRequest: builder.mutation<void, { fromUserId: string, toUserId: string }>({
+        sendFriendRequest: builder.mutation<null, { fromUserId: string, toUserId: string }>({
             queryFn: async ({ fromUserId, toUserId }) => {
                 try {
                     await friendService.sendFriendRequest(fromUserId, toUserId);
-                    return { data: undefined };
+                    return { data: null };
                 } catch (error: any) {
                     return { error: error.message };
                 }
@@ -31,11 +31,11 @@ export const friendsApiSlice = apiSlice.injectEndpoints({
             invalidatesTags: ['Friends']
         }),
 
-        acceptFriendRequest: builder.mutation<void, { requestId: string, userId: string }>({
+        acceptFriendRequest: builder.mutation<null, { requestId: string, userId: string }>({
             queryFn: async ({ requestId, userId }) => {
                 try {
                     await friendService.acceptFriendRequest(requestId, userId);
-                    return { data: undefined };
+                    return { data: null };
                 } catch (error: any) {
                     return { error: error.message };
                 }
@@ -43,11 +43,11 @@ export const friendsApiSlice = apiSlice.injectEndpoints({
             invalidatesTags: ['Friends']
         }),
 
-        rejectFriendRequest: builder.mutation<void, { requestId: string, userId: string }>({
+        rejectFriendRequest: builder.mutation<null, { requestId: string, userId: string }>({
             queryFn: async ({ requestId, userId }) => {
                 try {
                     await friendService.rejectFriendRequest(requestId, userId);
-                    return { data: undefined };
+                    return { data: null };
                 } catch (error: any) {
                     return { error: error.message };
                 }

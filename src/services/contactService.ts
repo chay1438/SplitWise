@@ -40,9 +40,26 @@ export const contactService = {
             if (contact.phoneNumbers) {
                 contact.phoneNumbers.forEach(phone => {
                     if (phone.number) {
-                        // Normalize phone number (remove spaces, dashes, etc.)
-                        const normalized = phone.number.replace(/[\s\-\(\)]/g, '');
-                        phoneNumbers.push(normalized);
+                        // Normalize keys for querying (robust matching)
+                        // 1. Remove non-numeric/non-plus chars
+                        const clean = phone.number.replace(/[^\d+]/g, '');
+                        // 2. Pure digits
+                        const digits = clean.replace(/\D/g, '');
+
+                        if (digits.length >= 10) {
+                            // Add exact clean version
+                            phoneNumbers.push(clean);
+                            // Add pure digits version
+                            phoneNumbers.push(digits);
+
+                            // Heuristic variants for India/Common formats
+                            if (digits.length === 10) {
+                                phoneNumbers.push(`+91${digits}`); // Try adding country code
+                            } else if (digits.length === 12 && digits.startsWith('91')) {
+                                phoneNumbers.push(`+${digits}`); // Ensure + is handled
+                                phoneNumbers.push(digits.slice(2)); // Try without country code
+                            }
+                        }
                     }
                 });
             }

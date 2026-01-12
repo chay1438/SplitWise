@@ -1,24 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, FlatList, ScrollView, Alert } from 'react-native';
 import { ScreenWrapper } from '../../components/common/ScreenWrapper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
-import { useCreateGroupMutation } from '../../store/api/groupsApi';
+import { useUpdateGroupMutation, useGetGroupsQuery, useGetGroupMembersQuery, useAddMemberMutation } from '../../store/api/groupsApi';
 import { useGetFriendsQuery } from '../../store/api/friendsApi';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../../constants';
+import { Colors, Typography } from '../../constants';
 import { handleError } from '../../lib/errorHandler';
 import { supabase } from '../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadImageToSupabase } from '../../services/imageUploadService';
+import { uploadImageToSupabase, deleteImageFromSupabase } from '../../services/imageUploadService';
 
-export default function MakeGroupScreen() {
+type EditGroupRouteProp = RouteProp<AppStackParamList, 'EditGroup'>;
+
+export default function EditGroupScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+    const route = useRoute<EditGroupRouteProp>();
+    const { groupId } = route.params;
 
     const currentUser = useCurrentUser();
-    const [createGroup, { isLoading: isCreating }] = useCreateGroupMutation();
+    const [updateGroup, { isLoading: isUpdating }] = useUpdateGroupMutation();
+    const [addMember] = useAddMemberMutation();
+
+    // Fetch group details
+    const { group } = useGetGroupsQuery(currentUser.id || '', {
+        selectFromResult: ({ data }) => ({
+            group: data?.find(g => g.id === groupId)
+        }),
+        skip: !groupId || !currentUser.id
+    });
+
+    // Fetch existing members
+    const { data: currentMembers = [] } = useGetGroupMembersQuery(groupId);
 
     // Form State
     const [name, setName] = useState('');
@@ -27,18 +43,32 @@ export default function MakeGroupScreen() {
 
     // Image State
     const [groupImage, setGroupImage] = useState<string | null>(null);
+    const [imageDeleted, setImageDeleted] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
 
     // Friend Fetch
     const { data: friends = [] } = useGetFriendsQuery(currentUser.id || '', { skip: !currentUser.id });
 
-    // Types
     const GROUP_TYPES = [
         { id: 'Trip', icon: 'airplane', label: 'Trip' },
         { id: 'Home', icon: 'home', label: 'Home' },
         { id: 'Couple', icon: 'heart', label: 'Couple' },
         { id: 'Other', icon: 'list', label: 'Other' },
     ];
+
+    // Initialize State from Group Data
+    useEffect(() => {
+        if (group) {
+            setName(group.name);
+            setType(group.type);
+            if (group.avatar_url) {
+                setGroupImage(group.avatar_url);
+            }
+            if (currentMembers) {
+                setSelectedFriends(new Set(currentMembers.map((m: any) => m.id)));
+            }
+        }
+    }, [group, currentMembers]);
 
     const handlePickImage = async () => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -50,64 +80,21 @@ export default function MakeGroupScreen() {
         const pickerResult = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             allowsEditing: true,
-            aspect: [1, 1], // Square for group icon
+            aspect: [1, 1],
             quality: 0.5,
         });
 
         if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets.length > 0) {
             setGroupImage(pickerResult.assets[0].uri);
+            setImageDeleted(false);
         }
     };
 
     const handleRemoveImage = () => {
+        if (groupImage && groupImage.startsWith('http')) {
+            setImageDeleted(true);
+        }
         setGroupImage(null);
-    };
-
-    const handleSubmit = async () => {
-        if (!name.trim()) {
-            Alert.alert("Error", "Please enter a group name");
-            return;
-        }
-
-        if (!currentUser.id) {
-            Alert.alert("Error", "You must be logged in to create a group.");
-            return;
-        }
-
-        try {
-            setUploadingImage(true);
-
-            // Handle Upload
-            let finalImageUrl = undefined;
-            if (groupImage) {
-                finalImageUrl = await uploadImageToSupabase(groupImage, 'avatars');
-            }
-
-            // Self-healing: Ensure profile exists
-            if (currentUser.session?.user) {
-                const u = currentUser.session.user;
-                await supabase.from('profiles').upsert({
-                    id: u.id,
-                    email: u.email,
-                    full_name: u.user_metadata?.name || u.email?.split('@')[0],
-                }, { onConflict: 'id' });
-            }
-
-            const groupData = await createGroup({
-                name,
-                type,
-                createdBy: currentUser.id,
-                memberIds: Array.from(selectedFriends),
-                // @ts-ignore
-                imageUrl: finalImageUrl
-            }).unwrap();
-
-            setUploadingImage(false);
-            navigation.replace('GroupDetails', { groupId: groupData.id, groupName: groupData.name });
-        } catch (error: any) {
-            setUploadingImage(false);
-            handleError(error, "Failed to save group");
-        }
     };
 
     const toggleFriend = (id: string) => {
@@ -117,8 +104,71 @@ export default function MakeGroupScreen() {
         setSelectedFriends(next);
     };
 
+    const handleSubmit = async () => {
+        if (!name.trim()) {
+            Alert.alert("Error", "Please enter a group name");
+            return;
+        }
+
+        try {
+            setUploadingImage(true);
+
+            // 1. Handle Image Deletion
+            if (imageDeleted && group?.avatar_url) {
+                deleteImageFromSupabase(group.avatar_url, 'avatars');
+            }
+
+            // 2. Handle Image Upload
+            let finalImageUrl = undefined;
+            if (imageDeleted) {
+                finalImageUrl = null;
+            } else if (groupImage && !groupImage.startsWith('http')) {
+                finalImageUrl = await uploadImageToSupabase(groupImage, 'avatars');
+            } else if (groupImage) {
+                finalImageUrl = groupImage;
+            }
+
+            // 3. Update Group Details
+            await updateGroup({
+                groupId,
+                name,
+                type,
+                // @ts-ignore
+                avatar_url: finalImageUrl
+            }).unwrap();
+
+            // 4. Update Members (Only Adding New Ones supported here)
+            // Note: Removing members usually handled in GroupDetails or specific management screen
+            if (currentMembers) {
+                const existingIds = new Set(currentMembers.map((m: any) => m.id));
+                const newIds = Array.from(selectedFriends).filter(id => !existingIds.has(id));
+
+                for (const friendId of newIds) {
+                    try {
+                        await addMember({ groupId, userId: friendId }).unwrap();
+                    } catch (e) {
+                        console.warn('Failed to add member', friendId, e);
+                    }
+                }
+            }
+
+            setUploadingImage(false);
+            Alert.alert("Success", "Group updated successfully!");
+            navigation.goBack();
+
+        } catch (error: any) {
+            setUploadingImage(false);
+            handleError(error, "Failed to update group");
+        }
+    };
+
     const renderFriendItem = ({ item }: { item: any }) => {
         const isSelected = selectedFriends.has(item.id);
+        // If already in group (from initial load), maybe disable unchecking? 
+        // For now, let's just show checkmarks. 
+        // Logic constraint: If we uncheck an EXISTING member, this screen doesn't explicitly remove them based on current 'MakeGroup' logic.
+        // It only ADDs regular friends.
+
         return (
             <TouchableOpacity
                 style={[styles.friendItem, isSelected && styles.friendItemSelected]}
@@ -139,17 +189,18 @@ export default function MakeGroupScreen() {
 
     return (
         <ScreenWrapper
-            gradient={[Colors.primary, Colors.primaryDark]}
             style={styles.container}
+            gradient={[Colors.primary, Colors.primaryDark]}
             statusBarStyle="light-content"
+            edges={['top']}
         >
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>New Group</Text>
-                <TouchableOpacity onPress={handleSubmit} disabled={isCreating || uploadingImage}>
-                    {isCreating || uploadingImage ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save</Text>}
+                <Text style={styles.headerTitle}>Edit Group</Text>
+                <TouchableOpacity onPress={handleSubmit} disabled={isUpdating || uploadingImage}>
+                    {isUpdating || uploadingImage ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save</Text>}
                 </TouchableOpacity>
             </View>
 
@@ -184,7 +235,6 @@ export default function MakeGroupScreen() {
                                 placeholder="Group Name"
                                 value={name}
                                 onChangeText={setName}
-                                autoFocus
                             />
                         </View>
                     </View>
@@ -235,11 +285,11 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         padding: 16,
-        // No bottom border, transparent on gradient
+        // Transparent on gradient
     },
-    cancelText: { fontSize: 16, color: '#fff' },
-    saveText: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+    cancelText: { ...Typography.button, color: '#fff' },
+    saveText: { ...Typography.button, color: '#fff' },
+    headerTitle: { ...Typography.h3, color: '#fff' },
     sheetContainer: {
         flex: 1,
         backgroundColor: '#fff',
@@ -251,12 +301,12 @@ const styles = StyleSheet.create({
     section: { marginBottom: 24 },
     inputRow: { flexDirection: 'row', alignItems: 'center' },
     photoButton: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', marginRight: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#ccc' },
-    nameInput: { flex: 1, fontSize: 18, borderBottomWidth: 1, borderBottomColor: Colors.primary, paddingVertical: 8 },
-    sectionLabel: { fontSize: 12, fontWeight: 'bold', color: '#999', textTransform: 'uppercase', marginBottom: 12 },
+    nameInput: { flex: 1, ...Typography.body1, fontSize: 18, borderBottomWidth: 1, borderBottomColor: Colors.primary, paddingVertical: 8 },
+    sectionLabel: { ...Typography.label, color: '#999', marginBottom: 12 },
     typeRow: { flexDirection: 'row', flexWrap: 'wrap' },
     typeChip: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: '#ddd', marginRight: 8, marginBottom: 8 },
     typeChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-    typeText: { marginLeft: 6, fontSize: 14, color: '#666' },
+    typeText: { marginLeft: 6, ...Typography.body2, color: '#666' },
     typeTextSelected: { color: '#fff', fontWeight: 'bold' },
     friendsListContainer: { marginTop: 8 },
     friendItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
@@ -264,10 +314,10 @@ const styles = StyleSheet.create({
     checkbox: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: '#ccc', marginRight: 12, justifyContent: 'center', alignItems: 'center' },
     checkboxSelected: { backgroundColor: Colors.success, borderColor: Colors.success },
     friendAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-    friendAvatarText: { fontWeight: 'bold', color: '#555' },
-    friendName: { fontSize: 16, color: '#333' },
+    friendAvatarText: { ...Typography.body2, fontWeight: 'bold', color: '#555' },
+    friendName: { ...Typography.body1, color: '#333' },
     friendNameSelected: { fontWeight: '600' },
-    emptyFriends: { color: '#999', fontStyle: 'italic' },
+    emptyFriends: { ...Typography.caption, color: '#999', fontStyle: 'italic' },
     editBadge: { position: 'absolute', bottom: -4, right: -4, backgroundColor: Colors.primary, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },
     removeBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#ff4444', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff', zIndex: 10 },
 });

@@ -10,6 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { Colors } from '../../constants';
+import { formatCurrency } from '../../utils';
 
 import { handleError } from '../../lib/errorHandler';
 
@@ -83,10 +84,10 @@ export default function FriendsScreen() {
         let balanceColor = Colors.textMuted;
 
         if (balance > 0) {
-            balanceText = `Owes you $${balance.toFixed(2)}`;
+            balanceText = `Owes you ${formatCurrency(balance)}`;
             balanceColor = Colors.success;
         } else if (balance < 0) {
-            balanceText = `You owe $${Math.abs(balance).toFixed(2)}`;
+            balanceText = `You owe ${formatCurrency(Math.abs(balance))}`;
             balanceColor = Colors.error;
         }
 
@@ -108,35 +109,41 @@ export default function FriendsScreen() {
     };
 
     return (
-        <ScreenWrapper style={styles.container} edges={['top']}>
+        <ScreenWrapper
+            style={styles.container}
+            gradient={[Colors.primary, Colors.primaryDark]}
+            statusBarStyle="light-content"
+        >
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Friends</Text>
                 <TouchableOpacity onPress={() => navigation.navigate('AddFriend')}>
-                    <Ionicons name="person-add" size={24} color={Colors.primary} />
+                    <Ionicons name="person-add" size={24} color="#fff" />
                 </TouchableOpacity>
             </View>
 
             {/* Friends List */}
-            {loadingFriends ? (
-                <View style={styles.centered}>
-                    <ActivityIndicator size="large" color={Colors.primary} />
-                </View>
-            ) : (
-                <FlatList
-                    data={friends.slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))}
-                    keyExtractor={item => item.id}
-                    renderItem={renderFriendItem}
-                    contentContainerStyle={styles.listContent}
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Ionicons name="people-outline" size={60} color="#ccc" />
-                            <Text style={styles.emptyText}>No friends yet.</Text>
-                            <Text style={styles.emptySubText}>Add friends to start sharing expenses.</Text>
-                        </View>
-                    }
-                />
-            )}
+            <View style={styles.sheetContainer}>
+                {loadingFriends ? (
+                    <View style={styles.centered}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                    </View>
+                ) : (
+                    <FlatList
+                        data={friends.slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))}
+                        keyExtractor={item => item.id}
+                        renderItem={renderFriendItem}
+                        contentContainerStyle={styles.listContent}
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <Ionicons name="people-outline" size={60} color="#ccc" />
+                                <Text style={styles.emptyText}>No friends yet.</Text>
+                                <Text style={styles.emptySubText}>Add friends to start sharing expenses.</Text>
+                            </View>
+                        }
+                    />
+                )}
+            </View>
         </ScreenWrapper>
     );
 }
@@ -144,21 +151,26 @@ export default function FriendsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
+        paddingTop: 10,
+        paddingBottom: 20,
     },
     headerTitle: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#333',
+        color: '#fff',
+    },
+    sheetContainer: {
+        flex: 1,
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        overflow: 'hidden',
     },
     centered: {
         flex: 1,

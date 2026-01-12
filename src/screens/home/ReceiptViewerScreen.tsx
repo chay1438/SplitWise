@@ -5,6 +5,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { Colors } from '../../constants';
+import { formatCurrency } from '../../utils';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'ReceiptViewer'>;
 
@@ -90,7 +91,7 @@ export default function ReceiptViewerScreen({ route, navigation }: Props) {
                         <Text style={styles.footerTitle}>{description}</Text>
                         <Text style={styles.footerDate}>{new Date(date).toLocaleDateString()}</Text>
                     </View>
-                    <Text style={styles.footerAmount}>${Number(amount).toFixed(2)}</Text>
+                    <Text style={styles.footerAmount}>{formatCurrency(Number(amount))}</Text>
                 </SafeAreaView>
             )}
         </View>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { ScreenWrapper } from '../../components/common/ScreenWrapper';
+import { Colors } from '../../constants';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
@@ -8,7 +9,6 @@ import { useGetGroupsQuery } from '../../store/api/groupsApi';
 import { Group, GroupWithMembers } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { Image } from 'react-native';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
@@ -62,7 +62,11 @@ export default function GroupsScreen() {
     );
 
     return (
-        <ScreenWrapper style={styles.container}>
+        <ScreenWrapper
+            gradient={[Colors.primary, Colors.primaryDark]}
+            style={styles.container}
+            statusBarStyle="light-content"
+        >
             <View style={styles.header}>
                 <View>
                     <Text style={styles.title}>My Groups</Text>
@@ -72,67 +76,75 @@ export default function GroupsScreen() {
                     style={styles.createButton}
                     onPress={() => navigation.navigate('MakeGroup')}
                 >
-                    <Ionicons name="add" size={20} color="#fff" />
+                    <Ionicons name="add" size={24} color="#fff" />
                 </TouchableOpacity>
             </View>
 
-            {loading && !isFetching ? (
-                <ActivityIndicator size="large" color="#FF5A5F" />
-            ) : (
-                <FlatList
-                    data={groups}
-                    keyExtractor={(item) => item.id}
-                    renderItem={renderItem}
-                    refreshControl={
-                        <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor="#FF5A5F" />
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Text>No groups found. Create one!</Text>
-                        </View>
-                    }
-                    contentContainerStyle={{ paddingBottom: 60 }}
-                />
-            )}
+            <View style={styles.sheetContainer}>
+                {loading && !isFetching ? (
+                    <ActivityIndicator size="large" color={Colors.primary} />
+                ) : (
+                    <FlatList
+                        data={groups}
+                        keyExtractor={(item) => item.id}
+                        renderItem={renderItem}
+                        refreshControl={
+                            <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={Colors.primary} />
+                        }
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <Text style={{ color: '#999' }}>No groups found. Create one!</Text>
+                            </View>
+                        }
+                        contentContainerStyle={{ paddingBottom: 60 }}
+                        showsVerticalScrollIndicator={false}
+                    />
+                )}
+            </View>
         </ScreenWrapper>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        padding: 16,
-        backgroundColor: '#f5f5f5',
-        paddingTop: 60,
+        flex: 1, // Removed backgroundColor
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        paddingHorizontal: 20,
+        paddingTop: 10,
+        paddingBottom: 20,
     },
     title: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: 'bold',
-        color: '#333',
+        color: '#fff', // White for gradient
     },
     subtitle: {
         fontSize: 14,
-        color: '#666',
+        color: 'rgba(255,255,255,0.8)', // Semi-transparent white
         marginTop: 4,
     },
     createButton: {
-        backgroundColor: '#FF5A5F',
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.2)', // Glass effect
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 3,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)',
+    },
+    sheetContainer: {
+        flex: 1,
+        backgroundColor: '#f5f5f5',
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        paddingHorizontal: 16,
+        paddingTop: 24,
+        overflow: 'hidden',
     },
     card: {
         backgroundColor: '#fff',
@@ -205,7 +217,7 @@ const styles = StyleSheet.create({
     settledStatus: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#007AFF', // Blue link style
+        color: Colors.primary, // Use primary color
     },
     emptyContainer: {
         alignItems: 'center',

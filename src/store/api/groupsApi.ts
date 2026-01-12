@@ -1,10 +1,11 @@
 import { apiSlice } from './apiSlice';
-import { supabase } from '../../lib/supabase';
+
 import { Group, GroupWithMembers } from '../../types';
 
 import { groupService } from '../../services/groupService';
 
 export const groupsApiSlice = apiSlice.injectEndpoints({
+    overrideExisting: true,
     endpoints: (builder) => ({
 
         getGroups: builder.query<GroupWithMembers[], string>({
@@ -17,6 +18,18 @@ export const groupsApiSlice = apiSlice.injectEndpoints({
                 }
             },
             providesTags: ['Groups']
+        }),
+
+        getGroupMembers: builder.query<any[], string>({
+            queryFn: async (groupId) => {
+                try {
+                    const data = await groupService.getGroupMembers(groupId);
+                    return { data };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            },
+            providesTags: (result, error, groupId) => [{ type: 'Groups', id: groupId }] // Invalidate if group changes? Or separate tag? Keeping Groups simpler.
         }),
 
         createGroup: builder.mutation<Group, { name: string; type: string; createdBy: string; memberIds?: string[]; avatar_url?: string }>({
@@ -40,6 +53,7 @@ export const groupsApiSlice = apiSlice.injectEndpoints({
                     return { error: error.message };
                 }
             },
+            invalidatesTags: ['Groups']
         }),
 
         updateGroup: builder.mutation<null, { groupId: string; name?: string; type?: string; avatar_url?: string | null }>({
@@ -106,4 +120,4 @@ export const groupsApiSlice = apiSlice.injectEndpoints({
     }),
 });
 
-export const { useGetGroupsQuery, useCreateGroupMutation, useAddMemberMutation, useUpdateGroupMutation, useLeaveGroupMutation, useDeleteGroupMutation, useUpdateMemberRoleMutation, useRemoveMemberMutation } = groupsApiSlice;
+export const { useGetGroupsQuery, useGetGroupMembersQuery, useCreateGroupMutation, useAddMemberMutation, useUpdateGroupMutation, useLeaveGroupMutation, useDeleteGroupMutation, useUpdateMemberRoleMutation, useRemoveMemberMutation } = groupsApiSlice;

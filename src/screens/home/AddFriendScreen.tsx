@@ -12,32 +12,25 @@ import { contactService } from '../../services/contactService';
 import { invitationService } from '../../services/invitationService';
 import * as Contacts from 'expo-contacts';
 
-type Tab = 'search' | 'contacts';
-
 export default function AddFriendScreen() {
     const currentUser = useCurrentUser();
     const navigation = useNavigation();
-    const [activeTab, setActiveTab] = useState<Tab>('search');
 
-    // Search State
-    const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<Profile[]>([]);
-    const [searchUsers, { isLoading: searching }] = useSearchUsersMutation();
+    // Search/Friend Request State (for sending requests to Matched Users)
     const [sendFriendRequest, { isLoading: addingFriend }] = useSendFriendRequestMutation();
 
     // Contacts State
     const [contacts, setContacts] = useState<Contacts.Contact[]>([]);
     const [loadingContacts, setLoadingContacts] = useState(false);
     const [matchedUsers, setMatchedUsers] = useState<Profile[]>([]);
-    const [contactSearchQuery, setContactSearchQuery] = useState('');
-    const [filteredContacts, setFilteredContacts] = useState<Contacts.Contact[]>([]);
-    const [filteredMatched, setFilteredMatched] = useState<Profile[]>([]);
 
+    // Local Filter State
+    const [contactSearchQuery, setContactSearchQuery] = useState('');
+
+    // Fetch contacts on mount
     useEffect(() => {
-        if (activeTab === 'contacts') {
-            fetchContacts();
-        }
-    }, [activeTab]);
+        fetchContacts();
+    }, []);
 
     const fetchContacts = async () => {
         if (!currentUser.id) return;
@@ -54,32 +47,12 @@ export default function AddFriendScreen() {
         }
     };
 
-    const handleSearch = async (text: string) => {
-        setSearchQuery(text);
-        if (text.length < 3) {
-            setSearchResults([]);
-            return;
-        }
-        // Search on every character (debouncing is handled by user typing speed usually, or we can rely on fast API)
-        try {
-            const results = await searchUsers(text).unwrap();
-            setSearchResults(results);
-        } catch (error) {
-            // calculated silence for typing
-        }
-    };
-
-    const clearSearch = () => {
-        setSearchQuery('');
-        setSearchResults([]);
-    };
-
     const handleAddFriend = async (userId: string, name: string) => {
         if (!currentUser.id) return;
         try {
             await sendFriendRequest({ fromUserId: currentUser.id, toUserId: userId }).unwrap();
             Alert.alert("Success", `Friend request sent to ${name}`);
-            setSearchResults(prev => prev.filter(p => p.id !== userId));
+            // Remove from matched list locally to reflect status
             setMatchedUsers(prev => prev.filter(p => p.id !== userId));
         } catch (err: any) {
             handleError(err, "Failed to send friend request");
@@ -87,8 +60,8 @@ export default function AddFriendScreen() {
     };
 
     const handleInvite = async (contact: Contacts.Contact) => {
-        const name = contact.name || 'Friend';
-        await invitationService.shareInvite(currentUser.full_name || 'Your friend', name);
+        // Use unified invitation service
+        await invitationService.inviteToApp(currentUser.full_name || 'Your friend');
     };
 
     const renderUserItem = ({ item }: { item: Profile }) => (
@@ -99,9 +72,7 @@ export default function AddFriendScreen() {
             <View style={styles.info}>
                 <Text style={styles.name}>{item.full_name || item.email}</Text>
                 <Text style={styles.email}>{item.email}</Text>
-                {(item as any).matchedBy && (
-                    <Text style={styles.matchedText}>Found in your contacts</Text>
-                )}
+                <Text style={styles.matchedText}>Found in your contacts</Text>
             </View>
             <TouchableOpacity
                 disabled={addingFriend}
@@ -133,6 +104,18 @@ export default function AddFriendScreen() {
         </View>
     );
 
+    // Filtering Logic
+    const filteredMatched = matchedUsers.filter(u =>
+    (u.full_name?.toLowerCase().includes(contactSearchQuery.toLowerCase()) ||
+        u.email?.toLowerCase().includes(contactSearchQuery.toLowerCase()))
+    );
+
+    const filteredContacts = contacts.filter(c =>
+        c.name?.toLowerCase().includes(contactSearchQuery.toLowerCase())
+    );
+
+    const hasResults = filteredMatched.length > 0 || filteredContacts.length > 0;
+
     return (
         <ScreenWrapper style={styles.container}>
             {/* Header */}
@@ -144,143 +127,62 @@ export default function AddFriendScreen() {
                 <View style={{ width: 24 }} />
             </View>
 
-            {/* Tabs */}
-            <View style={styles.tabsContainer}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'search' && styles.activeTab]}
-                    onPress={() => setActiveTab('search')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'search' && styles.activeTabText]}>Search User</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'contacts' && styles.activeTab]}
-                    onPress={() => setActiveTab('contacts')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'contacts' && styles.activeTabText]}>My Contacts</Text>
-                </TouchableOpacity>
-            </View>
-
             <View style={styles.content}>
-                {activeTab === 'search' ? (
-                    <>
-                        <View style={styles.searchBoxContainer}>
-                            <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
-                            <TextInput
-                                style={styles.searchInput}
-                                placeholder="Search by name or email"
-                                value={searchQuery}
-                                onChangeText={handleSearch}
-                                autoCapitalize="none"
-                                autoFocus
-                            />
-                            {searchQuery.length > 0 && (
-                                <TouchableOpacity onPress={clearSearch}>
-                                    <Ionicons name="close-circle" size={20} color="#ccc" />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                        {searching ? (
-                            <ActivityIndicator style={{ marginTop: 20 }} color={Colors.primary} />
-                        ) : (
-                            <FlatList
-                                data={[
-                                    ...filteredMatched,
-                                    ...searchResults.filter(s => !filteredMatched.some((fm: Profile) => fm.id === s.id)), // Dedup
-                                    ...filteredContacts
-                                ]}
-                                keyExtractor={(item, index) => {
-                                    if ('id' in item && typeof item.id === 'string') return item.id;
-                                    return `contact_${index}`;
-                                }}
-                                renderItem={({ item }) => {
-                                    // Check if it's a Profile or Contact
-                                    if ('email' in item || 'full_name' in item) {
-                                        return renderUserItem({ item: item as Profile });
-                                    } else {
-                                        return renderContactItem({ item: item as Contacts.Contact });
-                                    }
-                                }}
-                                ListEmptyComponent={
-                                    searchQuery.length > 0 ? (
-                                        <View style={styles.emptyContainer}>
-                                            <Text style={styles.emptyText}>No users or contacts found.</Text>
-                                        </View>
-                                    ) : (
-                                        <View style={styles.emptyContainer}>
-                                            <Ionicons name="search-outline" size={48} color="#ddd" />
-                                            <Text style={styles.helpText}>Enter a name or email to search.</Text>
-                                        </View>
-                                    )
-                                }
-                            />
-                        )}
-                    </>
-                ) : (
-                    <>
-                        <View style={styles.searchBoxContainer}>
-                            <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
-                            <TextInput
-                                style={styles.searchInput}
-                                placeholder="Search contacts..."
-                                value={contactSearchQuery}
-                                onChangeText={setContactSearchQuery}
-                                autoCapitalize="none"
-                            />
-                            {contactSearchQuery.length > 0 && (
-                                <TouchableOpacity onPress={() => setContactSearchQuery('')}>
-                                    <Ionicons name="close-circle" size={20} color="#ccc" />
-                                </TouchableOpacity>
-                            )}
-                        </View>
+                <View style={styles.searchBoxContainer}>
+                    <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search contacts..."
+                        value={contactSearchQuery}
+                        onChangeText={setContactSearchQuery}
+                        autoCapitalize="none"
+                    />
+                    {contactSearchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setContactSearchQuery('')}>
+                            <Ionicons name="close-circle" size={20} color="#ccc" />
+                        </TouchableOpacity>
+                    )}
+                </View>
 
-                        {loadingContacts ? (
-                            <View style={styles.centered}>
-                                <ActivityIndicator size="large" color={Colors.primary} />
-                                <Text style={styles.loadingText}>Syncing contacts...</Text>
-                            </View>
-                        ) : (
-                            <FlatList
-                                data={matchedUsers.filter(u =>
-                                (u.full_name?.toLowerCase().includes(contactSearchQuery.toLowerCase()) ||
-                                    u.email?.toLowerCase().includes(contactSearchQuery.toLowerCase()))
-                                )}
-                                keyExtractor={item => 'matched_' + item.id}
-                                renderItem={renderUserItem}
-                                ListHeaderComponent={
-                                    matchedUsers.filter(u =>
-                                    (u.full_name?.toLowerCase().includes(contactSearchQuery.toLowerCase()) ||
-                                        u.email?.toLowerCase().includes(contactSearchQuery.toLowerCase()))
-                                    ).length > 0 ? (
-                                        <View style={styles.sectionHeader}>
-                                            <Text style={styles.sectionHeaderText}>On SplitWise</Text>
-                                        </View>
-                                    ) : null
-                                }
-                                ListFooterComponent={
-                                    <View>
-                                        {contacts.filter(c => c.name?.toLowerCase().includes(contactSearchQuery.toLowerCase())).length > 0 && (
-                                            <View style={styles.sectionHeader}>
-                                                <Text style={styles.sectionHeaderText}>Invite to SplitWise</Text>
-                                            </View>
-                                        )}
-                                        <FlatList
-                                            data={contacts.filter(c => c.name?.toLowerCase().includes(contactSearchQuery.toLowerCase()))}
-                                            keyExtractor={(item, index) => (item as any).id || `contact_${index}`}
-                                            renderItem={renderContactItem}
-                                            scrollEnabled={false} // Nested list
-                                        />
-                                        {contacts.filter(c => c.name?.toLowerCase().includes(contactSearchQuery.toLowerCase())).length === 0 &&
-                                            matchedUsers.filter(u => (u.full_name?.toLowerCase().includes(contactSearchQuery.toLowerCase()) || u.email?.toLowerCase().includes(contactSearchQuery.toLowerCase()))).length === 0 && (
-                                                <View style={styles.emptyContainer}>
-                                                    <Ionicons name="people-outline" size={48} color="#ddd" />
-                                                    <Text style={styles.helpText}>No contacts found.</Text>
-                                                </View>
-                                            )}
+                {loadingContacts ? (
+                    <View style={styles.centered}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                        <Text style={styles.loadingText}>Syncing contacts...</Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredMatched} // Primary data is matched users
+                        keyExtractor={item => 'matched_' + item.id}
+                        renderItem={renderUserItem}
+                        ListHeaderComponent={
+                            filteredMatched.length > 0 ? (
+                                <View style={styles.sectionHeader}>
+                                    <Text style={styles.sectionHeaderText}>On SplitWise</Text>
+                                </View>
+                            ) : null
+                        }
+                        ListFooterComponent={
+                            <View>
+                                {filteredContacts.length > 0 && (
+                                    <View style={styles.sectionHeader}>
+                                        <Text style={styles.sectionHeaderText}>Invite to SplitWise</Text>
                                     </View>
-                                }
-                            />
-                        )}
-                    </>
+                                )}
+                                <FlatList
+                                    data={filteredContacts}
+                                    keyExtractor={(item, index) => (item as any).id || `contact_${index}`}
+                                    renderItem={renderContactItem}
+                                    scrollEnabled={false} // Nested list
+                                />
+                                {!hasResults && (
+                                    <View style={styles.emptyContainer}>
+                                        <Ionicons name="people-outline" size={48} color="#ddd" />
+                                        <Text style={styles.helpText}>No contacts found.</Text>
+                                    </View>
+                                )}
+                            </View>
+                        }
+                    />
                 )}
             </View>
         </ScreenWrapper>
@@ -308,31 +210,6 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: '#333',
-    },
-    tabsContainer: {
-        flexDirection: 'row',
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-    },
-    tab: {
-        flex: 1,
-        paddingVertical: 12,
-        alignItems: 'center',
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
-    },
-    activeTab: {
-        borderBottomColor: Colors.primary,
-    },
-    tabText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#888',
-    },
-    activeTabText: {
-        color: Colors.primary,
     },
     content: {
         flex: 1,
@@ -422,11 +299,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingTop: 60,
-    },
-    emptyText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#666',
     },
     helpText: {
         marginTop: 16,

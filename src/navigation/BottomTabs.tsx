@@ -42,8 +42,8 @@ export default function BottomTabs() {
                 tabBarActiveTintColor: '#FF5A5F',
                 tabBarInactiveTintColor: 'gray',
                 tabBarStyle: {
-                    paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8,
-                    height: Platform.OS === 'ios' ? 60 + insets.bottom : 70,
+                    paddingBottom: insets.bottom || 12, // Dynamic padding
+                    height: 60 + (insets.bottom || 12), // Dynamic height
                     borderTopWidth: 0,
                     elevation: 10,
                     shadowColor: '#000',

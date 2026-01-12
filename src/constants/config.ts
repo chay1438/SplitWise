@@ -7,10 +7,10 @@ export const AppConfig = {
     authBackground: '#0B0B0B', // Dark theme for login/signup
 
     // Status Bar Settings
-    statusBarStyle: 'light-content' as const,
+    statusBarStyle: 'dark-content' as const,
     statusBarTranslucent: true,
 
     // App-wide Constants
-    bottomTabHeight: 70,
+    bottomTabHeight: 60,
     borderRadius: 12,
 };

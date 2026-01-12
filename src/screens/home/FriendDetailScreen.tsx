@@ -4,6 +4,7 @@ import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { Colors } from '../../constants';
+import { formatCurrency } from '../../utils';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../hooks/useAuth';
 import { useGetExpensesQuery } from '../../store/api/expensesApi';
@@ -23,7 +24,8 @@ export default function FriendDetailScreen({ route, navigation }: Props) {
     const friend = friends?.find(f => f.id === friendId);
 
     const { data: expenses = [], isLoading: loadingExpenses } = useGetExpensesQuery({ userId: user?.id });
-    const { data: groups = [] } = useGetGroupsQuery(user?.id || '');
+    const { data: myGroups = [] } = useGetGroupsQuery(user?.id || '');
+    const { data: friendGroups = [] } = useGetGroupsQuery(friendId || '', { skip: !friendId });
 
     const [filter, setFilter] = useState<FilterType>('UNSETTLED');
     const [showOptions, setShowOptions] = useState(false);
@@ -77,8 +79,9 @@ export default function FriendDetailScreen({ route, navigation }: Props) {
 
     // Common Groups
     const commonGroups = useMemo(() => {
-        return groups.filter(g => g.members?.some((m: any) => m.id === friendId));
-    }, [groups, friendId]);
+        const friendGroupIds = new Set(friendGroups.map(g => g.id));
+        return myGroups.filter(g => friendGroupIds.has(g.id));
+    }, [myGroups, friendGroups]);
 
     const renderExpenseItem = ({ item }: { item: any }) => {
         const isPayer = item.payer_id === user?.id;
@@ -101,7 +104,9 @@ export default function FriendDetailScreen({ route, navigation }: Props) {
                 <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.desc}>{item.description}</Text>
                     <Text style={styles.subtext}>
-                        {isPayer ? `You paid ₹${item.amount.toFixed(2)}` : `${friend?.full_name || 'Friend'} paid ₹${item.amount.toFixed(2)}`}
+                        <Text style={styles.subtext}>
+                            {isPayer ? `You paid ${formatCurrency(item.amount)}` : `${friend?.full_name || 'Friend'} paid ${formatCurrency(item.amount)}`}
+                        </Text>
                     </Text>
                 </View>
                 <View>
@@ -135,23 +140,23 @@ export default function FriendDetailScreen({ route, navigation }: Props) {
                 </View>
 
                 <Text style={[styles.balanceAmount, { color: netBalance >= 0 ? Colors.success : Colors.error }]}>
-                    {netBalance >= 0 ? `Owes you ₹${netBalance.toFixed(2)}` : `You owe ₹${Math.abs(netBalance).toFixed(2)}`}
+                    {netBalance >= 0 ? `Owes you ${formatCurrency(netBalance)}` : `You owe ${formatCurrency(Math.abs(netBalance))}`}
                 </Text>
 
                 <View style={styles.statsRow}>
                     <View style={styles.statItem}>
                         <Text style={styles.statLabel}>You owe</Text>
-                        <Text style={styles.statValue}>₹{totalIOwe.toFixed(2)}</Text>
+                        <Text style={styles.statValue}>{formatCurrency(totalIOwe)}</Text>
                     </View>
                     <View style={styles.verticalLine} />
                     <View style={styles.statItem}>
                         <Text style={styles.statLabel}>Owes you</Text>
-                        <Text style={styles.statValue}>₹{totalOwedToMe.toFixed(2)}</Text>
+                        <Text style={styles.statValue}>{formatCurrency(totalOwedToMe)}</Text>
                     </View>
                 </View>
 
                 {netBalance !== 0 && (
-                    <TouchableOpacity style={styles.settleButton} onPress={() => navigation.navigate('SettleUp', { userId: friendId })}>
+                    <TouchableOpacity style={styles.settleButton} onPress={() => Alert.alert("Coming Soon", "Individual settlement logic is being updated.")}>
                         <Text style={styles.settleButtonText}>Settle Up</Text>
                     </TouchableOpacity>
                 )}

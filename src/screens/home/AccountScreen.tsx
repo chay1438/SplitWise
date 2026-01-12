@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Switch, Alert, Linking } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { ScreenWrapper } from '../../components/common/ScreenWrapper';
-import { Colors, Spacing } from '../../constants';
+import { Colors, Spacing, Typography } from '../../constants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSignOutMutation } from '../../store/api/authApi';
 import { useNavigation } from '@react-navigation/native';
@@ -74,12 +74,16 @@ export default function AccountScreen() {
     );
 
     return (
-        <ScreenWrapper edges={['top']} style={{ backgroundColor: '#f8f9fa' }} statusBarStyle="dark-content">
+        <ScreenWrapper edges={['top']} gradient={[Colors.primary, Colors.primaryDark]} statusBarStyle="light-content">
             <ScrollView contentContainerStyle={styles.container}>
 
                 {/* Header */}
                 <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8, marginLeft: -8 }}>
+                        <Ionicons name="arrow-back" size={28} color="#fff" />
+                    </TouchableOpacity>
                     <Text style={styles.title}>Account</Text>
+                    <View style={{ width: 40 }} />
                 </View>
 
                 {/* Profile Section */}
@@ -95,7 +99,7 @@ export default function AccountScreen() {
                     </TouchableOpacity>
                     <Text style={styles.userName}>{profile?.full_name || 'User Name'}</Text>
                     <Text style={styles.userEmail}>{user?.email}</Text>
-                    <TouchableOpacity style={styles.editProfileBtn} onPress={() => Alert.alert('Coming Soon', 'Profile editing')}>
+                    <TouchableOpacity style={styles.editProfileBtn} onPress={() => navigation.navigate('EditProfile')}>
                         <Text style={styles.editProfileText}>Edit Profile</Text>
                     </TouchableOpacity>
                 </View>
@@ -216,14 +220,18 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingTop: 10,
         marginBottom: 10,
     },
     title: {
-        fontSize: 32,
+        ...Typography.h2,
         fontWeight: 'bold',
-        color: '#333',
+        color: '#fff',
+        marginLeft: 20
     },
     profileSection: {
         alignItems: 'center',
@@ -237,21 +245,23 @@ const styles = StyleSheet.create({
         width: 100, height: 100, borderRadius: 50, backgroundColor: '#eee',
         justifyContent: 'center', alignItems: 'center',
     },
-    avatarText: { fontSize: 36, fontWeight: 'bold', color: '#666' },
+    avatarText: { ...Typography.h1, color: '#666' },
     editIcon: {
         position: 'absolute', bottom: 0, right: 0,
         backgroundColor: Colors.primary, width: 30, height: 30, borderRadius: 15,
         justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff'
     },
-    userName: { fontSize: 24, fontWeight: 'bold', color: '#333' },
-    userEmail: { fontSize: 14, color: '#666', marginBottom: 12 },
+    userName: { ...Typography.h3, color: '#fff', marginBottom: 4 },
+    userEmail: { ...Typography.body2, color: 'rgba(255,255,255,0.8)', marginBottom: 12 },
     editProfileBtn: {
-        paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: '#ddd',
+        paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
+        backgroundColor: 'rgba(255,255,255,0.1)'
     },
-    editProfileText: { fontSize: 14, fontWeight: '600', color: '#333' },
+    editProfileText: { ...Typography.button, color: '#fff', fontSize: 14 },
 
     sectionHeader: {
-        fontSize: 14, fontWeight: 'bold', color: '#999', textTransform: 'uppercase',
+        ...Typography.label,
+        color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase',
         marginLeft: 20, marginBottom: 8, marginTop: 16,
     },
     sectionCard: {
@@ -265,9 +275,9 @@ const styles = StyleSheet.create({
     },
     settingLeft: { flexDirection: 'row', alignItems: 'center' },
     iconContainer: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-    settingTitle: { fontSize: 16, fontWeight: '500', color: '#333' },
+    settingTitle: { ...Typography.body1, color: '#333' },
     settingRight: { flexDirection: 'row', alignItems: 'center' },
-    settingValue: { fontSize: 14, color: '#999', marginRight: 8 },
+    settingValue: { ...Typography.body2, color: '#999', marginRight: 8 },
     versionRow: { padding: 12, alignItems: 'center' },
-    versionText: { fontSize: 12, color: '#ccc' },
+    versionText: { ...Typography.caption, color: 'rgba(255,255,255,0.5)' },
 });

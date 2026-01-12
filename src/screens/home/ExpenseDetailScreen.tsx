@@ -1,9 +1,11 @@
+
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
-import { Colors } from '../../constants';
+import { Colors, Typography } from '../../constants';
+import { formatCurrency, formatDate } from '../../utils';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeleteExpenseMutation } from '../../store/api/expensesApi';
@@ -85,7 +87,7 @@ export default function ExpenseDetailScreen({ route, navigation }: Props) {
                         <Ionicons name="cart-outline" size={32} color={Colors.primary} />
                     </View>
                     <Text style={styles.expenseTitle}>{expense.description}</Text>
-                    <Text style={styles.expenseAmount}>₹{expense.amount.toFixed(2)}</Text>
+                    <Text style={styles.expenseAmount}>{formatCurrency(expense.amount)}</Text>
                     <Text style={styles.expenseDate}>
                         Added by {expense.created_by === currentUserId ? 'you' : 'someone else'} on {new Date(expense.date).toLocaleDateString()}
                     </Text>
@@ -116,8 +118,8 @@ export default function ExpenseDetailScreen({ route, navigation }: Props) {
                     <View style={[styles.statusCard, myStatus.type === 'OWED' ? styles.bgGreen : styles.bgRed]}>
                         <Text style={[styles.statusText, myStatus.type === 'OWED' ? styles.textGreen : styles.textRed]}>
                             {myStatus.type === 'OWED'
-                                ? `You are owed ₹${myStatus.amount.toFixed(2)}`
-                                : `You owe ₹${myStatus.amount.toFixed(2)}`
+                                ? `You are owed ${formatCurrency(myStatus.amount)} `
+                                : `You owe ${formatCurrency(myStatus.amount)} `
                             }
                         </Text>
                     </View>
@@ -131,7 +133,7 @@ export default function ExpenseDetailScreen({ route, navigation }: Props) {
                             <Text style={styles.avatarText}>{payerName.charAt(0)}</Text>
                         </View>
                         <Text style={styles.userName}>{payerName}</Text>
-                        <Text style={styles.amountText}>₹{expense.amount.toFixed(2)}</Text>
+                        <Text style={styles.amountText}>{formatCurrency(expense.amount)}</Text>
                     </View>
                 </View>
 
@@ -148,7 +150,7 @@ export default function ExpenseDetailScreen({ route, navigation }: Props) {
                                     <Text style={styles.avatarText}>{name.charAt(0)}</Text>
                                 </View>
                                 <Text style={styles.userName}>{name}</Text>
-                                <Text style={styles.amountText}>₹{parseFloat(split.amount).toFixed(2)}</Text>
+                                <Text style={styles.amountText}>{formatCurrency(parseFloat(split.amount))}</Text>
                             </View>
                         );
                     })}

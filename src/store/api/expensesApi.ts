@@ -41,11 +41,11 @@ export const expensesApiSlice = apiSlice.injectEndpoints({
             invalidatesTags: ['Expenses', 'Balances', 'Groups']
         }),
 
-        deleteExpense: builder.mutation<void, string>({
+        deleteExpense: builder.mutation<null, string>({
             queryFn: async (expenseId) => {
                 try {
                     await expenseService.deleteExpense(expenseId);
-                    return { data: undefined };
+                    return { data: null };
                 } catch (error: any) {
                     return { error: error.message };
                 }

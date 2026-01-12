@@ -1,185 +1,51 @@
-# 🚀 Next Steps - Implementation Checklist
+# 🚀 Next Steps & Progress
 
-## ✅ **Completed:**
-
-- ✅ Database updated (`phone_number` column added)
-- ✅ `app.json` updated with contacts permissions
-- ✅ Services created (`contactService.ts`, `invitationService.ts`)
-- ✅ Friend request flow updated (`friendService.ts`, `friendsApi.ts`)
-
----
-
-## 📦 **Step 1: Install NPM Packages** (5 minutes)
-
-Run these commands in your project terminal:
-
-```bash
-# Install contacts
-npx expo install expo-contacts
-
-# Install SMS and Email (for invitations)
-npx expo install expo-sms
-npx expo install expo-mail-composer
-
-# Install type definitions (for Buffer and Platform)
-npm install --save-dev @types/node
-```
-
-**Restart your terminal after** to ensure modules are loaded.
+## ✅ **Recently Completed (Invitation System):**
+- ✅ **Deep Linking Config:** Set up `splitwise://` scheme in `app.json` & `RootNavigation`.
+- ✅ **Backend Security:** Created `group_invitations` table & RPC function for secure joining.
+- ✅ **Invite Generation:** Added `useCreateInvitationMutation` (RTK Query) to generate unique tokens.
+- ✅ **Secure Joining:** Added `useJoinGroupMutation` to validate tokens and add members.
+- ✅ **Sharing UI:** Implemented "Invite via Link" in Group Settings & "Invite to App" in Add Friend.
+- ✅ **Refactor:** Moved logic to `invitationsApi.ts` and used `react-native-uuid`.
+- ✅ **Build:** Ran `npx expo prebuild` to sync native dependencies.
 
 ---
 
-## 🔄 **Step 2: Prebuild (Required for New Permissions)** (5 minutes)
+## 🎯 **Current Focus: Testing**
 
-Since you added new permissions, you need to rebuild:
-
+### **1. 📱 Test on Device (After Prebuild completes)**
+Since we just ran prebuild, you need to launch the app again:
 ```bash
-# Stop current build (Ctrl+C in the terminal where expo run:android is running)
-
-# Clean and rebuild
-npx expo prebuild --clean
-
-# Run again
 npx expo run:android
 ```
 
-**Why:** Permissions are native configs that need rebuild.
+**Test Scenarios:**
+1.  **Invite to App:**
+    *   Go to `Friends` -> `Add Friend`.
+    *   Find a contact (not on Splitwise).
+    *   Click **Invite**.
+    *   Check if WhatsApp/Share sheet opens with the link.
+2.  **Invite to Group:**
+    *   Go to a Group -> Settings (Gear icon).
+    *   Click **Invite via Link**.
+    *   Send the link to yourself (e.g., via "Note to Self" in WhatsApp).
+    *   **Click the link.**
+    *   Verify the app opens and (if logged in) accepts the invite.
 
 ---
 
-## 🎨 **Step 3: Test Friend Discovery** (Manual Testing)
+## 🔮 **Upcoming Features / Improvements**
 
-After rebuild, test the flow:
-
-### **Test 1: Find Friends from Contacts**
-1. Open app → Go to Friends screen
-2. Click "Find from Contacts"
-3. Grant permission when prompted
-4. Should see list of friends (if any registered with phone numbers)
-
-### **Test 2: Send Friend Request**
-1. From matched friends list
-2. Click "Add Friend"
-3. Should send pending request
-
-### **Test 3: Invite Unregistered Friend**
-1. From unmatched contacts list
-2. Click "Invite to Join"
-3. Choose share method (WhatsApp, SMS, etc.)
-4. Should open share sheet
+| Feature | Status | Description |
+| :--- | :--- | :--- |
+| **1. Activity Feed** | 🚧 In Progress | Ensure `ActivityScreen` shows real-time updates when expenses/groups are added. |
+| **2. Push Notifications** | ⏳ Pending | detailed notifications when someone adds an expense or invites you. |
+| **3. Settle Up (Advanced)** | ⏳ Pending | Improve `SettleUpScreen` to record payments with specific payment methods (UPI, Cash). |
+| **4. Profiling/Optimization** | ⏳ Pending | Check performance of contact loading and list rendering. |
 
 ---
 
-## 🐛 **Step 4: Fix Existing Lint Errors** (Optional but Recommended)
-
-You have a few lint errors to fix:
-
-### **Error 1: FriendsScreen.tsx**
-Location: Line 5
-```
-Module '../../store/api/friendsApi' has no exported member 'useAddFriendMutation'.
-```
-
-**Fix:** Change to `useSendFriendRequestMutation`
-
-```typescript
-// Old:
-import { useGetFriendsQuery, useAddFriendMutation } from '../../store/api/friendsApi';
-
-// New:
-import { useGetFriendsQuery, useSendFriendRequestMutation } from '../../store/api/friendsApi';
-```
-
-### **Error 2-4: invitationService.ts**
-These will be fixed after Step 1 (installing packages).
-
----
-
-## 📱 **Step 5: Update Signup to Capture Phone** (Optional)
-
-Add phone number field to SignUpScreen:
-
-```typescript
-// In SignUpScreen.tsx
-const [phoneNumber, setPhoneNumber] = useState('');
-
-// Add input field:
-<TextInput
-  placeholder="Phone Number (optional)"
-  value={phoneNumber}
-  onChangeText={setPhoneNumber}
-  keyboardType="phone-pad"
-/>
-
-// When signing up:
-if (phoneNumber) {
-  await supabase
-    .from('profiles')
-    .update({ phone_number: phoneNumber })
-    .eq('id', user.id);
-}
-```
-
-**This is optional** - phone numbers can also be populated from contacts during friend discovery.
-
----
-
-## 🎯 **Priority Order:**
-
-| Step | Priority | Time | Status |
-|------|---------|------|--------|
-| 1. Install packages | 🔴 HIGH | 5 min | ⏳ **DO NOW** |
-| 2. Prebuild & run | 🔴 HIGH | 5 min | ⏳ **DO NOW** |
-| 3. Fix FriendsScreen lint | 🟡 MEDIUM | 2 min | ⏳ Recommended |
-| 4. Test manually | 🟢 LOW | 10 min | Later |
-| 5. Add phone to signup | 🟢 LOW | 5 min | Later |
-
----
-
-## 💡 **Quick Commands Summary:**
-
-```bash
-# 1. Install packages
-npx expo install expo-contacts expo-sms expo-mail-composer
-npm install --save-dev @types/node
-
-# 2. Rebuild
-npx expo prebuild --clean
-npx expo run:android
-
-# 3. Wait for build to complete
-# 4. Test on device!
-```
-
----
-
-## ✅ **Success Criteria:**
-
-After completing steps 1-2, you should be able to:
-- ✅ Click "Find Friends" without errors
-- ✅ See permission dialog for contacts
-- ✅ Grant permission
-- ✅ View matched/unmatched contacts
-- ✅ Send friend requests
-- ✅ Share invitations
-
----
-
-## 📚 **Reference Documents:**
-
-- `DATABASE_REQUIREMENTS.md` - What we just added
-- `CONTACT_BASED_FRIENDS.md` - Contact matching guide
-- `FRIEND_INVITATION_SYSTEM.md` - Invitation system guide
-- `FRIEND_REQUEST_GUIDE.md` - Friend request flow
-- `ENHANCED_CONTACT_MATCHING.md` - Email + phone matching
-
----
-
-## 🚀 **Start Here:**
-
-1. **Stop current build** (Ctrl+C)
-2. **Run install commands** (listed above)
-3. **Prebuild and run**
-4. **Test!**
-
-Good luck! 🎉
+## 💡 **Technical Notes**
+- **UUID:** We now use `react-native-uuid` instead of a manual polyfill.
+- **Deep Linking:** The entry point is `RootNavigation.tsx` -> `handleDeepLink`.
+- **API:** All invitation logic is in `src/store/api/invitationsApi.ts`.

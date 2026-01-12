@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { Colors } from '../../constants';
+import { formatCurrency } from '../../utils';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../hooks/useAuth';
 import { useGetExpensesQuery } from '../../store/api/expensesApi';
@@ -64,7 +65,7 @@ export default function ActivityScreen() {
                     <Text style={styles.subText}>
                         <Text style={[styles.amount, { color: isPayer ? Colors.success : Colors.error }]}>
                             {isPayer ? 'You paid ' : 'You owe '}
-                            ${item.amount.toFixed(2)}
+                            {formatCurrency(item.amount)}
                             {/* Logic simplification: ignoring splits amount for activity view */}
                         </Text>
                         • {item.group?.name || 'No Group'}
@@ -76,41 +77,54 @@ export default function ActivityScreen() {
     };
 
     return (
-        <ScreenWrapper style={styles.container} edges={['top']}>
+        <ScreenWrapper
+            gradient={[Colors.primary, Colors.primaryDark]}
+            style={styles.container}
+            statusBarStyle="light-content"
+        >
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Activity</Text>
                 {/* Filter Placeholder */}
                 <TouchableOpacity>
-                    <Ionicons name="filter" size={24} color="#333" />
+                    <Ionicons name="filter" size={24} color="#fff" />
                 </TouchableOpacity>
             </View>
 
-            {isLoading ? (
-                <View style={styles.centered}><ActivityIndicator color={Colors.primary} /></View>
-            ) : (
-                <FlatList
-                    data={activities}
-                    keyExtractor={item => item.id}
-                    renderItem={renderActivityItem}
-                    contentContainerStyle={styles.list}
-                    ListEmptyComponent={
-                        <View style={styles.centered}>
-                            <Text style={{ color: '#999' }}>No recent activity</Text>
-                        </View>
-                    }
-                />
-            )}
+            <View style={styles.sheetContainer}>
+                {isLoading ? (
+                    <View style={styles.centered}><ActivityIndicator color={Colors.primary} /></View>
+                ) : (
+                    <FlatList
+                        data={activities}
+                        keyExtractor={item => item.id}
+                        renderItem={renderActivityItem}
+                        contentContainerStyle={styles.list}
+                        ListEmptyComponent={
+                            <View style={styles.centered}>
+                                <Text style={{ color: '#999' }}>No recent activity</Text>
+                            </View>
+                        }
+                    />
+                )}
+            </View>
         </ScreenWrapper>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
+    container: { flex: 1 },
     header: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#eee'
+        paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20,
     },
-    headerTitle: { fontSize: 24, fontWeight: 'bold' },
+    headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
+    sheetContainer: {
+        flex: 1,
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        overflow: 'hidden',
+    },
     list: { padding: 0 },
     item: {
         flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f9f9f9',
