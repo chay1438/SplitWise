@@ -1,0 +1,127 @@
+import { apiSlice } from './apiSlice';
+import { supabase } from '../../lib/supabase';
+import { Profile } from '../../types';
+import { Session } from '@supabase/supabase-js';
+import { setSession, setUser, setLoading } from '../slices/authSlice';
+
+import { authService } from '../../services/authService';
+
+export const authApiSlice = apiSlice.injectEndpoints({
+    overrideExisting: true,
+    endpoints: (builder) => ({
+        initializeAuth: builder.query<{ session: Session | null, user: Profile | null }, void>({
+            queryFn: async () => {
+                try {
+                    const session = await authService.getSession();
+
+                    let userProfile: Profile | null = null;
+                    if (session?.user) {
+                        const { data, error } = await supabase
+                            .from('profiles')
+                            .select('*')
+                            .eq('id', session.user.id)
+                            .single();
+                        if (error) console.error('AuthApi: profile fetch error', error);
+                        userProfile = data;
+                    }
+                    return { data: { session, user: userProfile } };
+                } catch (e: any) {
+                    console.error('AuthApi: initializeAuth error', e);
+                    return { error: e.message };
+                }
+            },
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                dispatch(setLoading(true));
+                try {
+                    const { data } = await queryFulfilled;
+                    dispatch(setSession(data.session));
+                    dispatch(setUser(data.user));
+                } catch (err) {
+                    console.error("AuthApi: Auth init failed", err);
+                } finally {
+                    console.log('AuthApi: onQueryStarted finally (setting loading false)');
+                    dispatch(setLoading(false));
+                }
+            },
+        }),
+        signOut: builder.mutation<null, void>({
+            queryFn: async () => {
+                try {
+                    await authService.signOut();
+                    return { data: null };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            },
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    await queryFulfilled;
+                    dispatch(setSession(null));
+                    dispatch(setUser(null));
+                    dispatch(apiSlice.util.resetApiState());
+                } catch (e) { }
+            }
+        }),
+        signIn: builder.mutation<null, { email: string; password: string }>({
+            queryFn: async ({ email, password }) => {
+                try {
+                    await authService.signIn(email, password);
+                    return { data: null };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            }
+        }),
+        signUp: builder.mutation<null, { email: string; password: string; name: string }>({
+            queryFn: async ({ email, password, name }) => {
+                try {
+                    await authService.signUp(email, password, name);
+                    return { data: null };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            }
+        }),
+        resetPassword: builder.mutation<null, string>({
+            queryFn: async (email) => {
+                try {
+                    await authService.resetPasswordForEmail(email);
+                    return { data: null };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            }
+        }),
+        updatePassword: builder.mutation<null, string>({
+            queryFn: async (password) => {
+                try {
+                    await authService.updatePassword(password);
+                    return { data: null };
+                } catch (error: any) {
+                    return { error: error.message };
+                }
+            }
+        }),
+        updateProfile: builder.mutation<Profile, Partial<Profile> & { id: string }>({
+            queryFn: async ({ id, ...updates }) => {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .update(updates)
+                    .eq('id', id)
+                    .select()
+                    .single();
+
+                if (error) return { error: error.message };
+                return { data };
+            },
+            async onQueryStarted(_, { dispatch, queryFulfilled }) {
+                try {
+                    const { data: updatedProfile } = await queryFulfilled;
+                    dispatch(setUser(updatedProfile));
+                } catch { }
+            }
+        })
+    }),
+});
+
+export const { useInitializeAuthQuery, useSignOutMutation, useSignInMutation, useSignUpMutation, useResetPasswordMutation, useUpdatePasswordMutation, useUpdateProfileMutation } = authApiSlice;
