@@ -7,39 +7,53 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native'
-import { Ionicons as Icon } from '@expo/vector-icons'
-import { supabase } from '../../lib/supabase'
+import Icon from 'react-native-vector-icons/Ionicons';
+import { useSignInMutation } from '../../store/api/authApi';
 
-export default function LoginScreen({ navigation }: any) {
-  const [email, setEmail] = useState('')
+export default function LoginScreen({ navigation, route }: any) {
+  const [email, setEmail] = useState(route.params?.email || '')
   const [password, setPassword] = useState('')
-  const [secure, setSecure] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [secure, setSecure] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [successMessage, setSuccessMessage] = useState(route.params?.successMessage || '')
+
+  const [signIn, { isLoading: loading }] = useSignInMutation();
 
   const handleLogin = async () => {
+    setErrorMessage('')
+    setSuccessMessage('') // Clear success message when logging in
+
     if (!email || !password) {
-      alert('Please enter email and password')
+      setErrorMessage('Please enter both email and password')
       return
     }
 
     try {
-      setLoading(true)
+      const res = await signIn({ email, password }).unwrap();
+      // On success, the store will update and auth listener will redirect
+    } catch (err: any) {
+      console.log('Login error:', err);
+      let msg = 'An unexpected error occurred';
 
-      const { data,error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      console.log('login response:',data)
-      console.log('login error:',error)
-
-      if (error) {
-        alert(error.message)
-        return
+      if (typeof err === 'string') {
+        msg = err;
+      } else if (err?.error) {
+        msg = err.error;
+      } else if (err?.message) {
+        msg = err.message;
+      } else if (err?.data?.error) {
+        msg = err.data.error;
+      } else if (err?.data?.message) {
+        msg = err.data.message;
       }
 
-    
-    } finally {
-      setLoading(false)
+      if (msg.includes('Invalid login credentials')) {
+        setErrorMessage('Incorrect email or password. Please try again.')
+      } else if (msg.includes('Email not confirmed')) {
+        setErrorMessage('Please verify your email address before logging in.')
+      } else {
+        setErrorMessage(msg)
+      }
     }
   }
 
@@ -83,9 +97,21 @@ export default function LoginScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
         <Text style={styles.forgot}>Forgot password?</Text>
       </TouchableOpacity>
+
+      {successMessage ? (
+        <Text style={{ color: '#10B981', marginBottom: 12, marginTop: 16, textAlign: 'center', fontSize: 14 }}>
+          ✓ {successMessage}
+        </Text>
+      ) : null}
+
+      {errorMessage ? (
+        <Text style={{ color: '#EF4444', marginBottom: 12, marginTop: successMessage ? 0 : 16, textAlign: 'center' }}>
+          {errorMessage}
+        </Text>
+      ) : null}
 
       {/* Login Button */}
       <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
@@ -164,7 +190,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   forgot: {
-    color: '#999',
+    color: '#4da6ff',
     textAlign: 'right',
     marginTop: 8,
   },
