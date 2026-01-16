@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { Colors } from '../../constants';
 import { formatCurrency } from '../../utils';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../hooks/useAuth';
-import { useGetExpensesQuery } from '../../store/api/expensesApi';
+import { useGetActivitiesQuery } from '../../store/api/activitiesApi';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
@@ -14,63 +14,81 @@ export default function ActivityScreen() {
     const { user } = useAuth();
     const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
-    // Fetch Expenses (Simulating Activity Feed)
-    const { data: expenses = [], isLoading } = useGetExpensesQuery({ userId: user?.id }, { skip: !user?.id });
-
-    // Sort by created_at desc (Most recent action)
-    const activities = useMemo(() => {
-        if (!expenses) return [];
-        return [...expenses].sort((a, b) => {
-            const timeA = new Date(a.created_at).getTime();
-            const timeB = new Date(b.created_at).getTime();
-            return timeB - timeA;
-        });
-    }, [expenses]);
+    // Fetch Real Activities
+    const { data: activities = [], isLoading } = useGetActivitiesQuery({ userId: user?.id || '' }, { skip: !user?.id });
 
     const renderActivityItem = ({ item }: { item: any }) => {
-        const isPayer = item.payer_id === user?.id;
-        const isCreator = item.created_by === user?.id;
-        const creatorName = isCreator ? 'You' : (item.created_by_user?.full_name || 'Someone'); // created_by_user field might not exist in Type, fallback needed
-
-        // Determine Action Text
+        const details = item.details || {};
         let actionText = "";
-        let iconName = "receipt-outline";
+        let subText = "";
+        let iconName = "notifications-outline";
         let iconColor = Colors.primary;
+        let amountDisplay = null;
 
-        if (item.category === 'payment') {
-            actionText = `${isPayer ? 'You' : item.payer?.full_name || 'Someone'} paid ${isPayer ? 'someone' : 'you'}`; // Simplified
-            iconName = "cash-outline";
-            iconColor = Colors.success;
-        } else {
-            if (isCreator) {
-                actionText = `You added "${item.description}"`;
-                if (!isPayer) actionText += ` (paid by ${item.payer?.full_name || 'someone else'})`;
-            } else {
-                actionText = `${creatorName} added "${item.description}"`;
-            }
+        switch (item.action) {
+            case 'expense_created':
+                iconName = "receipt-outline";
+                iconColor = Colors.primary;
+                actionText = `Added "${details.description}"`;
+                subText = details.creator_name ? `by ${details.creator_name}` : 'Expense added';
+                amountDisplay = (
+                    <Text style={[styles.amount, { color: Colors.error }]}>
+                        {formatCurrency(details.amount)}
+                    </Text>
+                );
+                break;
+
+            case 'paid_settlement':
+                iconName = "arrow-up-circle-outline";
+                iconColor = Colors.success;
+                actionText = `You paid ${details.payee_name}`;
+                amountDisplay = (
+                    <Text style={[styles.amount, { color: Colors.success }]}>
+                        {formatCurrency(details.amount)}
+                    </Text>
+                );
+                break;
+
+            case 'received_settlement':
+                iconName = "arrow-down-circle-outline";
+                iconColor = Colors.success;
+                actionText = `${details.payer_name} paid you`;
+                amountDisplay = (
+                    <Text style={[styles.amount, { color: Colors.success }]}>
+                        {formatCurrency(details.amount)}
+                    </Text>
+                );
+                break;
+
+            case 'joined_group':
+                iconName = "people-outline";
+                iconColor = "#9C27B0";
+                actionText = `You joined "${details.group_name}"`;
+                break;
+
+            default:
+                actionText = "New Activity";
+                break;
         }
 
-        const timeAgo = new Date(item.created_at).toLocaleString(); // Simplified date
+        const timeAgo = new Date(item.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
         return (
             <TouchableOpacity
                 style={styles.item}
-                onPress={() => navigation.navigate('ExpenseDetail' as any, { expense: item })}
+                disabled={!item.target_id || item.action === 'joined_group'} // Disable click for now if simpler
+            // onPress={() => navigation.navigate('ExpenseDetail', { expenseId: item.target_id })} // Future improvement
             >
-                <View style={[styles.iconBox, { backgroundColor: iconColor === Colors.success ? '#E8F5E9' : '#E0F2F1' }]}>
+                <View style={[styles.iconBox, { backgroundColor: iconColor + '20' }]}>
                     <Ionicons name={iconName} size={24} color={iconColor} />
                 </View>
                 <View style={styles.content}>
                     <Text style={styles.actionText}>{actionText}</Text>
                     <Text style={styles.subText}>
-                        <Text style={[styles.amount, { color: isPayer ? Colors.success : Colors.error }]}>
-                            {isPayer ? 'You paid ' : 'You owe '}
-                            {formatCurrency(item.amount)}
-                            {/* Logic simplification: ignoring splits amount for activity view */}
-                        </Text>
-                        • {item.group?.name || 'No Group'}
+                        {amountDisplay && <>{amountDisplay} • </>}
+                        {subText || timeAgo}
                     </Text>
-                    <Text style={styles.dateText}>{timeAgo}</Text>
+                    {amountDisplay && <Text style={styles.dateText}>{timeAgo}</Text>}
                 </View>
             </TouchableOpacity>
         );
@@ -101,7 +119,9 @@ export default function ActivityScreen() {
                         contentContainerStyle={styles.list}
                         ListEmptyComponent={
                             <View style={styles.centered}>
-                                <Text style={{ color: '#999' }}>No recent activity</Text>
+                                <Text style={{ color: '#999', textAlign: 'center', marginHorizontal: 40 }}>
+                                    No recent activity. Create expenses in a group to see them here.
+                                </Text>
                             </View>
                         }
                     />
@@ -127,15 +147,15 @@ const styles = StyleSheet.create({
     },
     list: { padding: 0 },
     item: {
-        flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f9f9f9',
+        flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f9f9f9', alignItems: 'center'
     },
     iconBox: {
         width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: 16,
     },
     content: { flex: 1 },
-    actionText: { fontSize: 16, color: '#333', marginBottom: 4 },
-    subText: { fontSize: 14, color: '#666', marginBottom: 4 },
+    actionText: { fontSize: 16, color: '#333', marginBottom: 4, fontWeight: '500' },
+    subText: { fontSize: 13, color: '#666' },
     amount: { fontWeight: 'bold' },
-    dateText: { fontSize: 12, color: '#999' },
+    dateText: { fontSize: 11, color: '#999', marginTop: 4 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 },
 });
