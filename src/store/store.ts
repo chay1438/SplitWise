@@ -29,7 +29,7 @@ import './api/authApi';
 const persistConfig = {
     key: 'root',
     storage: AsyncStorage,
-    whitelist: ['expenses', 'groups'], // DON'T persist auth - let it be managed by onAuthStateChange
+    whitelist: ['expense', 'group'], // DON'T persist auth - let it be managed by onAuthStateChange
     // We exclude 'auth' because session tokens should not be persisted
     // Supabase manages its own session storage
 };

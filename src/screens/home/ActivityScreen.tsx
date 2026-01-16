@@ -15,80 +15,65 @@ export default function ActivityScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
     // Fetch Real Activities
-    const { data: activities = [], isLoading } = useGetActivitiesQuery({ userId: user?.id || '' }, { skip: !user?.id });
+    const { data: activities = [], isLoading } = useGetActivitiesQuery(
+        { userId: user?.id || '' },
+        { pollingInterval: 5000, skip: !user?.id }
+    );
 
     const renderActivityItem = ({ item }: { item: any }) => {
-        const details = item.details || {};
+        const { action, details, created_at } = item;
         let actionText = "";
-        let subText = "";
         let iconName = "notifications-outline";
         let iconColor = Colors.primary;
-        let amountDisplay = null;
+        let subText = "";
 
-        switch (item.action) {
-            case 'expense_created':
-                iconName = "receipt-outline";
-                iconColor = Colors.primary;
-                actionText = `Added "${details.description}"`;
-                subText = details.creator_name ? `by ${details.creator_name}` : 'Expense added';
-                amountDisplay = (
-                    <Text style={[styles.amount, { color: Colors.error }]}>
-                        {formatCurrency(details.amount)}
-                    </Text>
-                );
-                break;
+        // Parse details based on Action Type
+        // 1. Expense Created
+        if (action === 'expense_created') {
+            const isCreator = details.created_by === user?.id;
+            const amount = formatCurrency(details.amount);
 
-            case 'paid_settlement':
-                iconName = "arrow-up-circle-outline";
-                iconColor = Colors.success;
-                actionText = `You paid ${details.payee_name}`;
-                amountDisplay = (
-                    <Text style={[styles.amount, { color: Colors.success }]}>
-                        {formatCurrency(details.amount)}
-                    </Text>
-                );
-                break;
-
-            case 'received_settlement':
-                iconName = "arrow-down-circle-outline";
-                iconColor = Colors.success;
-                actionText = `${details.payer_name} paid you`;
-                amountDisplay = (
-                    <Text style={[styles.amount, { color: Colors.success }]}>
-                        {formatCurrency(details.amount)}
-                    </Text>
-                );
-                break;
-
-            case 'joined_group':
-                iconName = "people-outline";
-                iconColor = "#9C27B0";
-                actionText = `You joined "${details.group_name}"`;
-                break;
-
-            default:
-                actionText = "New Activity";
-                break;
+            if (isCreator) {
+                actionText = `You added "${details.description}"`;
+                subText = `You paid ${amount}`;
+            } else {
+                actionText = `${details.creator_name || 'Someone'} added "${details.description}"`;
+                subText = `${details.creator_name} paid ${amount}`;
+            }
+            iconName = "receipt-outline";
+            iconColor = Colors.primary;
+        }
+        // 2. Settlement
+        else if (action === 'paid_settlement') {
+            actionText = `You paid ${details.payee_name}`;
+            subText = `Settled ${formatCurrency(details.amount)}`;
+            iconName = "arrow-up-circle-outline";
+            iconColor = Colors.success;
+        }
+        else if (action === 'received_settlement') {
+            actionText = `${details.payer_name} paid you`;
+            subText = `Received ${formatCurrency(details.amount)}`;
+            iconName = "arrow-down-circle-outline";
+            iconColor = Colors.success;
+        }
+        // 3. Group Join
+        else if (action === 'joined_group') {
+            actionText = `You joined "${details.group_name}"`;
+            iconName = "people-outline";
+            iconColor = Colors.secondary;
         }
 
-        const timeAgo = new Date(item.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const timeAgo = new Date(created_at).toLocaleString();
 
         return (
-            <TouchableOpacity
-                style={styles.item}
-                disabled={!item.target_id || item.action === 'joined_group'} // Disable click for now if simpler
-            // onPress={() => navigation.navigate('ExpenseDetail', { expenseId: item.target_id })} // Future improvement
-            >
-                <View style={[styles.iconBox, { backgroundColor: iconColor + '20' }]}>
+            <TouchableOpacity style={styles.item} disabled={action === 'joined_group'}>
+                <View style={[styles.iconBox, { backgroundColor: iconColor === Colors.success ? '#E8F5E9' : '#E0F2F1' }]}>
                     <Ionicons name={iconName} size={24} color={iconColor} />
                 </View>
                 <View style={styles.content}>
                     <Text style={styles.actionText}>{actionText}</Text>
-                    <Text style={styles.subText}>
-                        {amountDisplay && <>{amountDisplay} • </>}
-                        {subText || timeAgo}
-                    </Text>
-                    {amountDisplay && <Text style={styles.dateText}>{timeAgo}</Text>}
+                    {subText ? <Text style={styles.subText}>{subText}</Text> : null}
+                    <Text style={styles.dateText}>{timeAgo}</Text>
                 </View>
             </TouchableOpacity>
         );
@@ -102,10 +87,6 @@ export default function ActivityScreen() {
         >
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Activity</Text>
-                {/* Filter Placeholder */}
-                <TouchableOpacity>
-                    <Ionicons name="filter" size={24} color="#fff" />
-                </TouchableOpacity>
             </View>
 
             <View style={styles.sheetContainer}>
@@ -119,9 +100,7 @@ export default function ActivityScreen() {
                         contentContainerStyle={styles.list}
                         ListEmptyComponent={
                             <View style={styles.centered}>
-                                <Text style={{ color: '#999', textAlign: 'center', marginHorizontal: 40 }}>
-                                    No recent activity. Create expenses in a group to see them here.
-                                </Text>
+                                <Text style={{ color: '#999' }}>No recent activity</Text>
                             </View>
                         }
                     />
@@ -147,15 +126,15 @@ const styles = StyleSheet.create({
     },
     list: { padding: 0 },
     item: {
-        flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f9f9f9', alignItems: 'center'
+        flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f9f9f9',
     },
     iconBox: {
         width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: 16,
     },
     content: { flex: 1 },
-    actionText: { fontSize: 16, color: '#333', marginBottom: 4, fontWeight: '500' },
-    subText: { fontSize: 13, color: '#666' },
+    actionText: { fontSize: 16, color: '#333', marginBottom: 4 },
+    subText: { fontSize: 14, color: '#666', marginBottom: 4 },
     amount: { fontWeight: 'bold' },
-    dateText: { fontSize: 11, color: '#999', marginTop: 4 },
+    dateText: { fontSize: 12, color: '#999' },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 },
 });

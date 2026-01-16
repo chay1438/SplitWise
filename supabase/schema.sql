@@ -84,6 +84,8 @@ create table public.settlements (
   group_id uuid references public.groups(id) on delete set null,
   amount numeric(10,2) not null check (amount > 0),
   currency text default 'USD',
+  payment_method text check (payment_method in ('Cash', 'UPI', 'PayPal', 'Other')) default 'Cash',
+  notes text,
   date timestamp with time zone default timezone('utc'::text, now()) not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
