@@ -1,5 +1,3 @@
-
-// Authentication flow ready for PR review
 import React, { useState } from 'react'
 import {
   View,
@@ -9,8 +7,8 @@ import {
   StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '../../lib/supabase'
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useSignUpMutation } from '../../store/api/authApi';
 
 const SignUpScreen = ({ navigation }: any) => {
   const [name, setName] = useState('')
@@ -19,65 +17,69 @@ const SignUpScreen = ({ navigation }: any) => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
-
-
-
-
+  const [signUp, { isLoading: loading }] = useSignUpMutation();
 
   const handleSignUp = async () => {
-  setErrorMessage('')
+    setErrorMessage('')
 
-  if (!name || !email || !password || !confirmPassword) {
-    setErrorMessage('Please fill all fields')
-    return
-  }
-
-  if (password !== confirmPassword) {
-    setErrorMessage('Passwords do not match')
-    return
-  }
-
-  try {
-    setLoading(true)
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name },
-      },
-    })
-
-    if (error) {
-      const msg = error.message.toLowerCase()
-
-     
-      if (
-        msg.includes('already') ||
-        msg.includes('registered') ||
-        msg.includes('exists')
-      ) {
-        setErrorMessage(
-          'This email is already registered. Please log in instead.'
-        )
-      } else {
-        setErrorMessage(error.message)
-      }
+    if (!name || !email || !password || !confirmPassword) {
+      setErrorMessage('Please fill all fields')
       return
     }
 
-   
-    alert(
-      'Account created successfully. Please check your email to verify your account.'
-    )
-    navigation.navigate('Login')
-  } finally {
-    setLoading(false)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setErrorMessage('Please enter a valid email address');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMessage('Passwords do not match')
+      return
+    }
+
+    try {
+      await signUp({ email, password, name }).unwrap();
+
+      // Success! Navigate to Login with success message
+      setErrorMessage('') // clear any error
+      navigation.navigate('Login', {
+        email,
+        successMessage: 'Account created successfully! Please log in to continue.'
+      })
+    } catch (err: any) {
+      console.log('Signup error:', err);
+      let msg = 'An unexpected error occurred';
+
+      if (typeof err === 'string') {
+        msg = err;
+      } else if (err?.error) {
+        msg = err.error;
+      } else if (err?.message) {
+        msg = err.message;
+      } else if (err?.data?.error) {
+        msg = err.data.error;
+      } else if (err?.data?.message) {
+        msg = err.data.message;
+      }
+
+      const lowMsg = msg.toLowerCase();
+      if (
+        lowMsg.includes('already') ||
+        lowMsg.includes('registered') ||
+        lowMsg.includes('exists') ||
+        lowMsg.includes('duplicate')
+      ) {
+        setErrorMessage(
+          'This email is already registered. Please use the login screen instead.'
+        )
+      } else {
+        setErrorMessage(msg)
+      }
+    }
   }
-}
 
 
 
@@ -172,14 +174,14 @@ const SignUpScreen = ({ navigation }: any) => {
           onPress={handleSignUp}
           disabled={loading}
         >
-        <Text style={styles.primaryButtonText}>
-          {loading ? 'Creating...' : 'Create Account'}
-        </Text>
+          <Text style={styles.primaryButtonText}>
+            {loading ? 'Creating...' : 'Create Account'}
+          </Text>
         </TouchableOpacity>
         {errorMessage ? (
-        <Text style={{ color: '#EF4444', marginBottom: 12 }}>
-        {errorMessage}
-        </Text>
+          <Text style={{ color: '#EF4444', marginBottom: 12 }}>
+            {errorMessage}
+          </Text>
         ) : null}
 
 

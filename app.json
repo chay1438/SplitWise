@@ -3,7 +3,17 @@
     "name": "splitwise-app",
     "slug": "splitwise-app",
     "version": "1.0.0",
+    "scheme": "splitwise",
     "orientation": "portrait",
+    "plugins": [
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow SplitWise to access your contacts to find friends who are already using the app."
+        }
+      ],
+      "./plugins/withAndroidFonts"
+    ],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -13,15 +23,23 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.manasa_sheri.splitwiseapp",
+      "infoPlist": {
+        "NSContactsUsageDescription": "SplitWise needs access to your contacts to help you find friends who are already using the app."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "READ_CONTACTS"
+      ],
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.manasa_sheri.splitwiseapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
