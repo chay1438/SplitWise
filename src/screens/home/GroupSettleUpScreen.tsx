@@ -84,7 +84,9 @@ export default function GroupSettleUpScreen({ navigation, route }: Props) {
                 payeeId,
                 amount: val,
                 groupId,
-                date: new Date().toISOString()
+                date: new Date().toISOString(),
+                paymentMethod: method,
+                notes: note
             }).unwrap();
 
             setModalVisible(false);
@@ -139,7 +141,9 @@ export default function GroupSettleUpScreen({ navigation, route }: Props) {
                 <View style={{ marginLeft: 10, flex: 1 }}>
                     <Text style={styles.historyText}>
                         {isPayer ? "You paid" : (isPayee ? "You received" : "Payment")} ₹{item.amount}
+                        {item.payment_method && item.payment_method !== 'Cash' && <Text style={{ fontSize: 13, color: '#666' }}> via {item.payment_method}</Text>}
                     </Text>
+                    {item.notes ? <Text style={styles.historyNote} numberOfLines={1}>{item.notes}</Text> : null}
                     <Text style={styles.historyDate}>{dateStr}, {timeStr}</Text>
                 </View>
             </View>
@@ -304,6 +308,7 @@ const styles = StyleSheet.create({
     historyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 8, marginBottom: 8 },
     historyText: { fontSize: 15, color: '#333', fontWeight: '500' },
     historyDate: { fontSize: 12, color: '#999' },
+    historyNote: { fontSize: 13, color: '#555', fontStyle: 'italic', marginBottom: 2 },
 
     emptyBox: { alignItems: 'center', padding: 20 },
     emptyText: { color: '#999', marginTop: 10 },

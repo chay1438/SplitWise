@@ -26,6 +26,8 @@ export const settlementService = {
         amount: number;
         groupId?: string;
         date: string;
+        paymentMethod?: string;
+        notes?: string;
     }): Promise<Settlement> {
         const { data: settlement, error } = await supabase
             .from('settlements')
@@ -35,7 +37,9 @@ export const settlementService = {
                 group_id: data.groupId,
                 amount: data.amount,
                 date: data.date,
-                currency: 'USD'
+                currency: 'INR',
+                payment_method: data.paymentMethod || 'Cash',
+                notes: data.notes
             })
             .select()
             .single();
