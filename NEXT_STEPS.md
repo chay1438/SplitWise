@@ -38,9 +38,9 @@ npx expo run:android
 
 | Feature | Status | Description |
 | :--- | :--- | :--- |
-| **1. Activity Feed** | 🚧 In Progress | Ensure `ActivityScreen` shows real-time updates when expenses/groups are added. |
+| **1. Activity Feed** | 🟡 Ready (DB Pending) | Code updated to use real `activities` table. **Run `triggers.sql` in Supabase!** |
 | **2. Push Notifications** | ⏳ Pending | detailed notifications when someone adds an expense or invites you. |
-| **3. Settle Up (Advanced)** | ⏳ Pending | Improve `SettleUpScreen` to record payments with specific payment methods (UPI, Cash). |
+| **3. Settle Up (Advanced)** | ✅ Completed | Added Payment Method & Notes to Settlements. Database updated. |
 | **4. Profiling/Optimization** | ⏳ Pending | Check performance of contact loading and list rendering. |
 
 ---
