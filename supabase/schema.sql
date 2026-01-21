@@ -82,7 +82,7 @@ create table public.settlements (
   payer_id uuid references public.profiles(id) not null,
   payee_id uuid references public.profiles(id) not null,
   group_id uuid references public.groups(id) on delete set null,
-  amount numeric(10,2) not null check (amount > 0),
+  amount numeric(6,2) not null check (amount > 0),
   currency text default 'USD',
   payment_method text check (payment_method in ('Cash', 'UPI', 'PayPal', 'Other')) default 'Cash',
   notes text,
@@ -135,7 +135,9 @@ create policy "Public profiles are viewable by everyone." on public.profiles for
 create policy "Users can insert their own profile." on public.profiles for insert with check (auth.uid() = id);
 create policy "Users can update own profile." on public.profiles for update using (auth.uid() = id);
 
-create policy "View groups if member" on public.groups for select using (
+create policy "View groups if member or creator" on public.groups for select using (
+  (created_by = auth.uid()) 
+  OR
   exists (select 1 from public.group_members where group_id = groups.id and user_id = auth.uid())
 );
 create policy "Create groups" on public.groups for insert with check (auth.uid() = created_by);
@@ -155,7 +157,11 @@ begin
 end;
 $$ language plpgsql security definer;
 
-create policy "View members" on public.group_members for select using (
+create policy "View own memberships" on public.group_members for select using (
+  user_id = auth.uid()
+);
+
+create policy "View team members" on public.group_members for select using (
   is_member_of(group_id)
 );
 create policy "Join group" on public.group_members for insert with check (true);
