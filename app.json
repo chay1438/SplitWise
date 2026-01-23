@@ -12,7 +12,8 @@
           "contactsPermission": "Allow SplitWise to access your contacts to find friends who are already using the app."
         }
       ],
-      "./plugins/withAndroidFonts"
+      "./plugins/withAndroidFonts",
+      "expo-secure-store"
     ],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

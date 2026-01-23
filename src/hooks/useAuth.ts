@@ -6,7 +6,7 @@ import { useInitializeAuthQuery } from '../store/api/authApi';
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
 import * as Contacts from 'expo-contacts';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 export function useAuth() {
   const dispatch = useAppDispatch();
@@ -48,7 +48,7 @@ export function useAuth() {
   const requestContactsPermission = async () => {
     try {
       // Check if we've already asked
-      const hasAsked = await AsyncStorage.getItem('contacts_permission_asked');
+      const hasAsked = await SecureStore.getItemAsync('contacts_permission_asked');
       if (hasAsked) return;
 
       // Ask for permission
@@ -60,14 +60,14 @@ export function useAuth() {
             text: 'Not Now',
             style: 'cancel',
             onPress: async () => {
-              await AsyncStorage.setItem('contacts_permission_asked', 'true');
+              await SecureStore.setItemAsync('contacts_permission_asked', 'true');
             }
           },
           {
             text: 'Allow',
             onPress: async () => {
               const { status } = await Contacts.requestPermissionsAsync();
-              await AsyncStorage.setItem('contacts_permission_asked', 'true');
+              await SecureStore.setItemAsync('contacts_permission_asked', 'true');
 
               if (status === 'granted') {
                 Alert.alert('Success', 'You can now find friends from your contacts!');
