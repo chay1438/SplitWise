@@ -8,9 +8,15 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { configureGoogleSignIn, signInWithGoogle } from '../../services/auth/googleAuth';
+import { useEffect } from 'react';
 import { useSignUpMutation } from '../../store/api/authApi';
 
 const SignUpScreen = ({ navigation }: any) => {
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
+
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -80,6 +86,20 @@ const SignUpScreen = ({ navigation }: any) => {
       }
     }
   }
+
+  const handleGoogleLogin = async () => {
+    try {
+      setErrorMessage('');
+      const data = await signInWithGoogle();
+      if (data) {
+        // Supabase auth state listener will handle navigation
+        console.log('Google Sign-Up successful');
+      }
+    } catch (error: any) {
+      console.log('Google Sign-Up Error:', error);
+      setErrorMessage(error.message || 'Google Sign-In failed');
+    }
+  };
 
 
 
@@ -194,7 +214,7 @@ const SignUpScreen = ({ navigation }: any) => {
         </View>
 
         {/* Google Button */}
-        <TouchableOpacity style={styles.googleButton}>
+        <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
           <Ionicons
             name="logo-google"
             size={18}

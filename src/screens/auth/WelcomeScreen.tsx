@@ -3,8 +3,27 @@ import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AntDesign from 'react-native-vector-icons/AntDesign';
+import { configureGoogleSignIn, signInWithGoogle } from '../../services/auth/googleAuth';
+import { useEffect } from 'react';
 
 export default function WelcomeScreen({ navigation }: any) {
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    try {
+      const data = await signInWithGoogle();
+      if (data) {
+        // Supabase auth state listener will handle navigation
+        console.log('Google Sign-In successful from Welcome');
+      }
+    } catch (error: any) {
+      console.log('Welcome Google Login Error:', error);
+      // Optional: show alert or toast
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -30,7 +49,7 @@ export default function WelcomeScreen({ navigation }: any) {
 
         {/* Buttons */}
         <View style={styles.buttonsContainer}>
-          <TouchableOpacity style={styles.googleButton}>
+          <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
             <Ionicons name="logo-google" size={20} color="#ea4435ff" style={styles.buttonIcon} />
             <Text style={styles.googleButtonText}>Continue with Google</Text>
           </TouchableOpacity>
