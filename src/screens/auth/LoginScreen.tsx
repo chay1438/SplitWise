@@ -9,6 +9,8 @@ import {
 } from 'react-native'
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSignInMutation } from '../../store/api/authApi';
+import { configureGoogleSignIn, signInWithGoogle } from '../../services/auth/googleAuth';
+import { useEffect } from 'react';
 
 export default function LoginScreen({ navigation, route }: any) {
   const [email, setEmail] = useState(route.params?.email || '')
@@ -18,6 +20,24 @@ export default function LoginScreen({ navigation, route }: any) {
   const [successMessage, setSuccessMessage] = useState(route.params?.successMessage || '')
 
   const [signIn, { isLoading: loading }] = useSignInMutation();
+
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    try {
+      setErrorMessage('');
+      const data = await signInWithGoogle();
+      if (data) {
+        // Supabase auth state listener will handle navigation
+        console.log('Google Sign-In successful');
+      }
+    } catch (error: any) {
+      console.log('Google Login Error:', error);
+      setErrorMessage(error.message || 'Google Sign-In failed');
+    }
+  };
 
   const handleLogin = async () => {
     setErrorMessage('')
@@ -130,12 +150,11 @@ export default function LoginScreen({ navigation, route }: any) {
       </View>
 
       {/* Google Login */}
-      <TouchableOpacity style={styles.googleBtn}>
+      <TouchableOpacity style={styles.googleBtn} onPress={handleGoogleLogin}>
         <Icon name="logo-google" size={20} color="#000" />
         <Text style={styles.googleText}>Continue with Google</Text>
       </TouchableOpacity>
 
-      {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>Don't have an account?</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
@@ -145,6 +164,7 @@ export default function LoginScreen({ navigation, route }: any) {
     </View>
   )
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
