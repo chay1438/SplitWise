@@ -8,6 +8,7 @@ import { Profile } from '../types';
 import * as Contacts from 'expo-contacts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+
 export function useAuth() {
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
