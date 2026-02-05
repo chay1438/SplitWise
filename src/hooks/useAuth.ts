@@ -8,6 +8,7 @@ import { Profile } from '../types';
 import * as Contacts from 'expo-contacts';
 import * as SecureStore from 'expo-secure-store';
 
+
 export function useAuth() {
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
