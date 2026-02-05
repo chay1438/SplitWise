@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import { useRealtimeSubscriptions } from '../hooks/useRealtimeSubscriptions'
 import { NavigationContainer } from '@react-navigation/native'
 import AuthStack from './AuthStack'
 import AppStack from './AppStack'
@@ -19,6 +20,10 @@ const linking = {
 
 export default function RootNavigation() {
   const { session, loading } = useAuth()
+
+  // 🔥 Enable Realtime Global Listeners
+  useRealtimeSubscriptions();
+
   console.log('ROOT NAV SESSION:', !!session);
   console.log('ROOT NAV LOADING:', loading);
 

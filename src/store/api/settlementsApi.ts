@@ -25,6 +25,8 @@ export const settlementsApiSlice = apiSlice.injectEndpoints({
             amount: number;
             groupId?: string;
             date: string;
+            paymentMethod?: string;
+            notes?: string;
         }>({
             queryFn: async (input) => {
                 try {

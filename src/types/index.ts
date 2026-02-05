@@ -76,6 +76,8 @@ export interface Settlement {
     currency: string;
     date: string;
     created_at: string;
+    payment_method?: string;
+    notes?: string;
 }
 
 export interface Activity {

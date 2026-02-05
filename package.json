@@ -10,6 +10,8 @@
     "prebuild": "npx expo prebuild",
     "prebuild:clean": "npx expo prebuild --clean",
     "prebuild:android": "npx expo prebuild --platform android",
+    "android:generate": "npx expo prebuild --platform android",
+    "ios:generate": "npx expo prebuild --platform ios",
     "clean:full": "npx rimraf node_modules android package-lock.json",
     "clean": "cd android && gradlew clean && cd ..",
     "lint": "eslint .",
